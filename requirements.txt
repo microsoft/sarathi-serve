@@ -1,0 +1,18 @@
+ninja  # For faster builds.
+psutil
+ray >= 2.5.1
+pandas  # Required for Ray data.
+pyarrow  # Required for Ray data.
+sentencepiece  # Required for LLaMA tokenizer.
+numpy
+torch == 2.0.1
+transformers >= 4.33.1  # Required for Code Llama.
+xformers >= 0.0.22 # Required for multi-query / grouped-query attention
+fastapi
+uvicorn
+pydantic < 2  # Required for OpenAI server.
+matplotlib
+plotly_express
+wandb
+kaleido
+ddsketch
