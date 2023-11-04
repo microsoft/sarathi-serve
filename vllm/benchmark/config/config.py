@@ -18,6 +18,7 @@ def custom_bool(val):
 
 
 class Config:
+
     def __init__(self, args: dict):
         self._args = args
 
@@ -25,7 +26,7 @@ class Config:
         return self._args.get(name, None)
 
     def __reduce__(self):
-        return self.__class__, (self._args,)
+        return self.__class__, (self._args, )
 
 
 class ConfigParser:

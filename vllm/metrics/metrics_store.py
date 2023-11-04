@@ -42,6 +42,7 @@ def if_write_metrics(func):
 
 
 def check_enabled(func):
+
     def wrapper(self, *args, **kwargs):
         if self._disabled:
             return
@@ -178,7 +179,8 @@ class MetricsStore(metaclass=Singleton):
                 self._save_table_to_wandb,
             )
 
-        self._high_level_cuda_operation_metrics: Dict[HighLevelCudaOperationMetrics, CDFSketch] = {}
+        self._high_level_cuda_operation_metrics: Dict[
+            HighLevelCudaOperationMetrics, CDFSketch] = {}
         for metric_name in HighLevelCudaOperationMetrics:
             self._high_level_cuda_operation_metrics[metric_name] = CDFSketch(
                 metric_name.value,
@@ -311,7 +313,8 @@ class MetricsStore(metaclass=Singleton):
             SequenceMetricsTimeDistributions.REQUEST_EXECUTION_TIME].put(
                 seq.seq_id, seq_metrics.execution_time)
         self._seq_metrics_time_distributions[
-            SequenceMetricsTimeDistributions.REQUEST_EXECUTION_TIME_NORMALIZED].put(
+            SequenceMetricsTimeDistributions.
+            REQUEST_EXECUTION_TIME_NORMALIZED].put(
                 seq.seq_id, seq_metrics.execution_time_normalized)
         self._seq_metrics_time_distributions[
             SequenceMetricsTimeDistributions.REQUEST_PREEMPTION_TIME].put(
@@ -426,7 +429,8 @@ class MetricsStore(metaclass=Singleton):
 
         if self._enable_chrome_trace:
             self._chrome_trace.append(
-                scheduler_outputs.to_chrome_trace_dict(replica_id, batch_start_time,
+                scheduler_outputs.to_chrome_trace_dict(replica_id,
+                                                       batch_start_time,
                                                        batch_end_time))
 
     @check_enabled
@@ -521,7 +525,7 @@ class MetricsStore(metaclass=Singleton):
             dataseries.plot_cdf(base_plot_path,
                                 f"{dataseries._metric_name}_execution_time",
                                 TIME_STR_MS)
-            normalized_time = dataseries.sum / self._tensor_parallel_size            
+            normalized_time = dataseries.sum / self._tensor_parallel_size
             if "mlp" in dataseries._metric_name \
                 or "attn" in dataseries._metric_name \
                 or "rms_norm" == dataseries._metric_name \
@@ -549,7 +553,7 @@ class MetricsStore(metaclass=Singleton):
                                 f"{dataseries._metric_name}_execution_time",
                                 TIME_STR_MS)
             if dataseries._metric_name == "schedule" or dataseries._metric_name == "process_model_outputs":
-                normalized_time = dataseries.sum 
+                normalized_time = dataseries.sum
             else:
                 normalized_time = dataseries.sum / self._tensor_parallel_size
 
@@ -599,12 +603,12 @@ class MetricsStore(metaclass=Singleton):
             CompletionMetricsTimeSeries.REQUEST_ARRIVAL].min_x
 
         for dataseries in self._completion_metrics_time_series.values():
-            # subtract the first request arrival time from all the completion times                
+            # subtract the first request arrival time from all the completion times
             dataseries.plot_step(base_plot_path,
                                  f"{dataseries._y_name}_time_series",
                                  COUNT_STR,
                                  start_time=first_request_arrival_time)
-        
+
     @check_enabled
     def plot(self):
         base_plot_path = f"{self._output_dir}/plots/"

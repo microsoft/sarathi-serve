@@ -1,7 +1,6 @@
 import datetime
 from vllm import LLM, SamplingParams
 
-
 BASE_OUTPUT_DIR = "./offline_inference_output"
 
 # Sample prompts.

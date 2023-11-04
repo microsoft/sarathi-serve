@@ -40,6 +40,7 @@ class CpuOperationMetrics(enum.Enum):
     PROCESS_MODEL_OUTPUTS = "process_model_outputs"
     POST_PREPARE_INPUTS_BARRIER = "post_prepare_inputs_barrier"
 
+
 class HighLevelCudaOperationMetrics(enum.Enum):
     MODEL_EXECUTION_CUDA = "model_execution_cuda"
     SAMPLER_CUDA = "sample_cuda"

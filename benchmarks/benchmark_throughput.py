@@ -178,8 +178,8 @@ def main(args: argparse.Namespace):
             requests, args.model, args.tokenizer, args.quantization,
             args.tensor_parallel_size, args.seed, args.n, args.use_beam_search,
             args.trust_remote_code, args.scheduler_type,
-            args.max_num_batched_tokens, args.max_num_seqs,
-            args.chunk_size, args.enable_rolling_prefills, args.prefill_fitting_tolerance,
+            args.max_num_batched_tokens, args.max_num_seqs, args.chunk_size,
+            args.enable_rolling_prefills, args.prefill_fitting_tolerance,
             args.write_metrics, args.output_dir, args.enable_op_level_metrics,
             args.enable_chrome_trace, args.save_table_to_wandb,
             args.wandb_project, args.wandb_group, args.wandb_run_name)
@@ -223,18 +223,18 @@ if __name__ == "__main__":
                         default=1000,
                         help="Number of prompts to process.")
     parser.add_argument('--scheduler-type',
-                            type=str,
-                            default="vllm",
-                            help='type of scheduler to use')
+                        type=str,
+                        default="vllm",
+                        help='type of scheduler to use')
     parser.add_argument('--max-num-seqs',
                         type=int,
                         required=True,
                         help='maximum number of sequences per iteration')
     parser.add_argument('--max-num-batched-tokens',
-                    type=int,
-                    default=None,
-                    help='maximum number of batched tokens per '
-                    'iteration')
+                        type=int,
+                        default=None,
+                        help='maximum number of batched tokens per '
+                        'iteration')
     parser.add_argument('--chunk-size',
                         type=int,
                         default=None,
@@ -248,15 +248,16 @@ if __name__ == "__main__":
         type=float,
         default=0.0,
         help=
-        'maximum fraction of prefill chunk that can be left empty in sarathi'
-    )
+        'maximum fraction of prefill chunk that can be left empty in sarathi')
     parser.add_argument("--write-metrics",
                         action="store_true",
                         help="'Capture metrics and export them")
-    parser.add_argument('--output-dir',
-                        type=str,
-                        default=f"./outputs/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
-                        help='directory to save captured metrics')
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default=
+        f"./outputs/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
+        help='directory to save captured metrics')
     parser.add_argument('--enable-op-level-metrics',
                         action='store_true',
                         default=True,

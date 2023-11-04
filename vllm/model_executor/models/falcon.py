@@ -117,8 +117,8 @@ class FalconAttention(nn.Module):
                 perform_initialization=False,
                 skip_bias_add=True,
                 linear_metric_name=OperationMetrics.ATTN_PRE_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_PRE_PROJ_ALL_GATHER,
+                communication_metric_name=OperationMetrics.
+                ATTN_PRE_PROJ_ALL_GATHER,
             )
         elif self.multi_query:
             self.total_num_kv_heads = 1
@@ -170,7 +170,8 @@ class FalconAttention(nn.Module):
             reduce_results=self.reduce_row_parallel_results,
             linear_metric_name=OperationMetrics.ATTN_POST_PROJ,
             communication_metric_name=OperationMetrics.
-            ATTN_POST_PROJ_ALL_REDUCE,)
+            ATTN_POST_PROJ_ALL_REDUCE,
+        )
 
         self.use_rotary = config.rotary
         self.use_alibi = config.alibi
@@ -244,14 +245,15 @@ class FalconMLP(nn.Module):
         super().__init__()
         hidden_size = config.hidden_size
 
-        self.dense_h_to_4h = ColumnParallelLinear(hidden_size,
-                                                  4 * hidden_size,
-                                                  bias=config.bias,
-                                                  gather_output=False,
-                                                  perform_initialization=False,
-                                                  skip_bias_add=True,
-                                                  linear_metric_name=OperationMetrics.MLP_UP_PROJ,
-                                                  communication_metric_name=OperationMetrics.MLP_UP_PROJ_ALL_GATHER)
+        self.dense_h_to_4h = ColumnParallelLinear(
+            hidden_size,
+            4 * hidden_size,
+            bias=config.bias,
+            gather_output=False,
+            perform_initialization=False,
+            skip_bias_add=True,
+            linear_metric_name=OperationMetrics.MLP_UP_PROJ,
+            communication_metric_name=OperationMetrics.MLP_UP_PROJ_ALL_GATHER)
         self.act = nn.GELU()
         self.reduce_row_parallel_results = not (config.new_decoder_architecture
                                                 or config.parallel_attn)
@@ -264,7 +266,8 @@ class FalconMLP(nn.Module):
             skip_bias_add=True,
             reduce_results=self.reduce_row_parallel_results,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE)
+            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE
+        )
 
         self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION)
 
@@ -371,7 +374,9 @@ class FalconModel(nn.Module):
 
         # Embedding + LN Embedding
         self.word_embeddings = VocabParallelEmbedding(
-            config.vocab_size, self.embed_dim, perform_initialization=False,
+            config.vocab_size,
+            self.embed_dim,
+            perform_initialization=False,
             linear_metric_name=OperationMetrics.EMBED_LINEAR,
             communication_metric_name=OperationMetrics.EMBED_ALL_REDUCE,
         )
@@ -416,13 +421,14 @@ class FalconForCausalLM(nn.Module):
         super().__init__()
         self.config = config
         self.transformer = FalconModel(config)
-        self.lm_head = ColumnParallelLinear(config.hidden_size,
-                                            config.vocab_size,
-                                            bias=False,
-                                            gather_output=False,
-                                            perform_initialization=False,
-                                            linear_metric_name=OperationMetrics.LM_HEAD_LINEAR,
-                                             communication_metric_name=OperationMetrics.LM_HEAD_ALL_GATHER)
+        self.lm_head = ColumnParallelLinear(
+            config.hidden_size,
+            config.vocab_size,
+            bias=False,
+            gather_output=False,
+            perform_initialization=False,
+            linear_metric_name=OperationMetrics.LM_HEAD_LINEAR,
+            communication_metric_name=OperationMetrics.LM_HEAD_ALL_GATHER)
         # self.sampler = Sampler(config.vocab_size)
 
     def forward(

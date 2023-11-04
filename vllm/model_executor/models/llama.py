@@ -82,7 +82,8 @@ class LlamaMLP(nn.Module):
             perform_initialization=False,
             quant_config=quant_config,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.
+            MLP_DOWN_PROJ_ALL_REDUCE,
             layer_id=layer_id,
         )
         if hidden_act != "silu":
@@ -90,7 +91,8 @@ class LlamaMLP(nn.Module):
                              "Only silu is supported for now.")
         self.act_fn = SiluAndMul()
 
-        self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION, layer_id=layer_id)
+        self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION,
+                                               layer_id=layer_id)
 
     def forward(self, x):
         gate_up, _ = self.gate_up_proj(x)
@@ -215,9 +217,10 @@ class LlamaDecoderLayer(nn.Module):
                                        eps=config.rms_norm_eps)
         self.post_attention_layernorm = RMSNorm(config.hidden_size,
                                                 eps=config.rms_norm_eps)
-    
+
         self._add_timer = CudaTimer(OperationMetrics.ADD, layer_id=layer_id)
-        self._rms_norm_timer = CudaTimer(OperationMetrics.RMS_NORM, layer_id=layer_id)
+        self._rms_norm_timer = CudaTimer(OperationMetrics.RMS_NORM,
+                                         layer_id=layer_id)
 
     def forward(
         self,
@@ -272,8 +275,11 @@ class LlamaModel(nn.Module):
             communication_metric_name=OperationMetrics.EMBED_ALL_REDUCE,
         )
         self.layers = nn.ModuleList([
-            LlamaDecoderLayer(config, quant_config, layer_id=i,)
-            for i in range(config.num_hidden_layers)
+            LlamaDecoderLayer(
+                config,
+                quant_config,
+                layer_id=i,
+            ) for i in range(config.num_hidden_layers)
         ])
         self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
@@ -321,14 +327,15 @@ class LlamaForCausalLM(nn.Module):
         self.model = LlamaModel(config, quant_config)
         vocab_size = ((config.vocab_size + 63) // 64) * 64
         # NOTE: The LM head is not quantized.
-        self.lm_head = ParallelLinear.column(config.hidden_size,
-                                             vocab_size,
-                                             bias=False,
-                                             gather_output=False,
-                                             perform_initialization=False,
-                                             quant_config=None,
-                                             linear_metric_name=OperationMetrics.LM_HEAD_LINEAR,
-                                             communication_metric_name=OperationMetrics.LM_HEAD_ALL_GATHER)
+        self.lm_head = ParallelLinear.column(
+            config.hidden_size,
+            vocab_size,
+            bias=False,
+            gather_output=False,
+            perform_initialization=False,
+            quant_config=None,
+            linear_metric_name=OperationMetrics.LM_HEAD_LINEAR,
+            communication_metric_name=OperationMetrics.LM_HEAD_ALL_GATHER)
         # self.sampler = Sampler(config.vocab_size)
 
     def forward(
@@ -345,7 +352,7 @@ class LlamaForCausalLM(nn.Module):
         # next_tokens = self.sampler(self.lm_head.weight, hidden_states,
         #                            input_metadata)
         # return next_tokens
-        
+
     _column_parallel_layers = []
     _row_parallel_layers = ["o_proj", "down_proj"]
 

@@ -5,6 +5,7 @@ from vllm.metrics.metrics_store import MetricsStore
 
 
 class CpuTimer:
+
     def __init__(self, name: CpuOperationMetrics):
         self.name = name
         self.start_time = None
@@ -24,5 +25,5 @@ class CpuTimer:
 
         self.metrics_store.push_cpu_operation_metrics(
             self.name,
-            (perf_counter() - self.start_time) * 1e3 # convert to ms
+            (perf_counter() - self.start_time) * 1e3  # convert to ms
         )

@@ -62,13 +62,19 @@ class Worker:
         self._output_tensors_cache = {}
         self._disable_cuda_graph = True
 
-        self._prepare_inputs_e2e_timer = CpuTimer(CpuOperationMetrics.PREPARE_INPUTS_E2E)
-        self._prepare_inputs_launch_timer = CpuTimer(CpuOperationMetrics.PREPARE_INPUTS_LAUNCH)
-        self._post__prepare_inputs_barrier_timer = CpuTimer(CpuOperationMetrics.POST_PREPARE_INPUTS_BARRIER)
-        self._sampler_launch_timer = CpuTimer(CpuOperationMetrics.SAMPLER_LAUNCH)
+        self._prepare_inputs_e2e_timer = CpuTimer(
+            CpuOperationMetrics.PREPARE_INPUTS_E2E)
+        self._prepare_inputs_launch_timer = CpuTimer(
+            CpuOperationMetrics.PREPARE_INPUTS_LAUNCH)
+        self._post__prepare_inputs_barrier_timer = CpuTimer(
+            CpuOperationMetrics.POST_PREPARE_INPUTS_BARRIER)
+        self._sampler_launch_timer = CpuTimer(
+            CpuOperationMetrics.SAMPLER_LAUNCH)
         self._sampler_e2e_timer = CpuTimer(CpuOperationMetrics.SAMPLER_E2E)
-        self._model_execution_launch_timer = CpuTimer(CpuOperationMetrics.MODEL_EXECUTION_LAUNCH)
-        self._model_execution_e2e_timer = CpuTimer(CpuOperationMetrics.MODEL_EXECUTION_E2E)
+        self._model_execution_launch_timer = CpuTimer(
+            CpuOperationMetrics.MODEL_EXECUTION_LAUNCH)
+        self._model_execution_e2e_timer = CpuTimer(
+            CpuOperationMetrics.MODEL_EXECUTION_E2E)
 
     def init_model(self, rendezvous_id: int):
         # This env var set by Ray causes exceptions with graph building.
@@ -166,13 +172,18 @@ class Worker:
         # Reset the seed to ensure that the random state is not affected by
         # the model initialization and profiling.
         set_random_seed(self.model_config.seed)
-        print(f"Finished profiling num_gpu_blocks={num_gpu_blocks}, num_cpu_blocks={num_cpu_blocks}")
+        print(
+            f"Finished profiling num_gpu_blocks={num_gpu_blocks}, num_cpu_blocks={num_cpu_blocks}"
+        )
         return num_gpu_blocks, num_cpu_blocks
 
     def init_graph(self, batch_size):
         seqs = []
         vocab_size = self.model.config.vocab_size
-        sampling_params = SamplingParams(top_p=0.99, top_k=vocab_size - 1, ignore_eos=True, max_tokens=1)
+        sampling_params = SamplingParams(top_p=0.99,
+                                         top_k=vocab_size - 1,
+                                         ignore_eos=True,
+                                         max_tokens=1)
         for group_id in range(batch_size):
             seq_data = SequenceData([0])
             seq = SequenceGroupMetadata(
@@ -189,11 +200,12 @@ class Worker:
             seqs)
 
         input_metadata.max_context_len = self.model_config.max_model_len
-        
+
         self._input_tensors_cache[batch_size] = {
             "tokens_tensor": tokens_tensor,
             "positions_tensor": positions_tensor,
-            "current_tokens_slot_mapping_tensor": input_metadata.current_tokens_slot_mapping,
+            "current_tokens_slot_mapping_tensor":
+            input_metadata.current_tokens_slot_mapping,
             "context_lens_tensor": input_metadata.context_lens,
             "block_tables_tensor": input_metadata.block_tables,
         }
@@ -202,8 +214,10 @@ class Worker:
         print(f"Recording graph for batch size: {batch_size}")
         for _ in range(5):
             hidden_states = self.model(
-                input_ids=self._input_tensors_cache[batch_size]["tokens_tensor"],
-                positions=self._input_tensors_cache[batch_size]["positions_tensor"],
+                input_ids=self._input_tensors_cache[batch_size]
+                ["tokens_tensor"],
+                positions=self._input_tensors_cache[batch_size]
+                ["positions_tensor"],
                 kv_caches=self.gpu_cache,
                 input_metadata=input_metadata,
                 cache_events=None,
@@ -218,11 +232,13 @@ class Worker:
         mempool = torch.cuda.graph_pool_handle()
 
         self.start_profiling("cpu")
-        
+
         with torch.cuda.graph(graph, pool=mempool):
             hidden_states = self.model(
-                input_ids=self._input_tensors_cache[batch_size]["tokens_tensor"],
-                positions=self._input_tensors_cache[batch_size]["positions_tensor"],
+                input_ids=self._input_tensors_cache[batch_size]
+                ["tokens_tensor"],
+                positions=self._input_tensors_cache[batch_size]
+                ["positions_tensor"],
                 kv_caches=self.gpu_cache,
                 input_metadata=input_metadata,
                 cache_events=None,
@@ -250,7 +266,7 @@ class Worker:
 
         max_num_seqs_rounded = self.scheduler_config.max_num_seqs + \
             (-self.scheduler_config.max_num_seqs % 8)
-    
+
         for batch_size in range(8, max_num_seqs_rounded + 1, 8):
             self.init_graph(batch_size)
 
@@ -371,51 +387,58 @@ class Worker:
 
         # this tensor is only used in prefill, so doesn't matter for graph
         prefix_plus_current_prompt_tokens_slot_mapping_tensor = torch.tensor(
-                prefix_plus_current_prompt_tokens_slot_mapping,
-                dtype=torch.int,
-                device="cuda")
+            prefix_plus_current_prompt_tokens_slot_mapping,
+            dtype=torch.int,
+            device="cuda")
 
         num_tokens = len(input_tokens)
 
         # Convert to tensors.
         if contains_prompt or not self.cache_config or self._disable_cuda_graph or num_tokens not in self._input_tensors_cache:
             tokens_tensor = torch.tensor(input_tokens,
-                                        dtype=torch.long,
-                                        device="cuda")
+                                         dtype=torch.long,
+                                         device="cuda")
             positions_tensor = torch.tensor(input_positions,
                                             dtype=torch.long,
                                             device="cuda")
             current_tokens_slot_mapping_tensor = torch.tensor(
                 current_tokens_slot_mapping, dtype=torch.int, device="cuda")
             context_lens_tensor = torch.tensor(context_lens,
-                                            dtype=torch.int,
-                                            device="cuda")
+                                               dtype=torch.int,
+                                               device="cuda")
             block_tables_tensor = torch.tensor(padded_block_tables,
-                                            dtype=torch.int,
-                                            device="cuda")
+                                               dtype=torch.int,
+                                               device="cuda")
         else:
             assert len(input_tokens) == len(input_positions)
             assert len(input_tokens) == len(current_tokens_slot_mapping)
-            assert len(input_tokens) == len(context_lens), f"{len(input_tokens)} != {len(context_lens)}"
+            assert len(input_tokens) == len(
+                context_lens), f"{len(input_tokens)} != {len(context_lens)}"
             assert len(input_tokens) == len(padded_block_tables)
 
             # just copy over data to existing tensors
-            self._input_tensors_cache[num_tokens]["tokens_tensor"].copy_(torch.tensor(input_tokens,
-                                    dtype=torch.long))
-            self._input_tensors_cache[num_tokens]["positions_tensor"].copy_(torch.tensor(input_positions,
-                                                dtype=torch.long))
-            self._input_tensors_cache[num_tokens]["current_tokens_slot_mapping_tensor"].copy_(torch.tensor(
-                    current_tokens_slot_mapping, dtype=torch.int))
-            self._input_tensors_cache[num_tokens]["context_lens_tensor"].copy_(torch.tensor(context_lens,
-                                                dtype=torch.int))
-            self._input_tensors_cache[num_tokens]["block_tables_tensor"].copy_(torch.tensor(padded_block_tables,
-                                                dtype=torch.int))
+            self._input_tensors_cache[num_tokens]["tokens_tensor"].copy_(
+                torch.tensor(input_tokens, dtype=torch.long))
+            self._input_tensors_cache[num_tokens]["positions_tensor"].copy_(
+                torch.tensor(input_positions, dtype=torch.long))
+            self._input_tensors_cache[num_tokens][
+                "current_tokens_slot_mapping_tensor"].copy_(
+                    torch.tensor(current_tokens_slot_mapping, dtype=torch.int))
+            self._input_tensors_cache[num_tokens]["context_lens_tensor"].copy_(
+                torch.tensor(context_lens, dtype=torch.int))
+            self._input_tensors_cache[num_tokens]["block_tables_tensor"].copy_(
+                torch.tensor(padded_block_tables, dtype=torch.int))
 
-            tokens_tensor = self._input_tensors_cache[num_tokens]["tokens_tensor"]
-            positions_tensor = self._input_tensors_cache[num_tokens]["positions_tensor"]
-            current_tokens_slot_mapping_tensor = self._input_tensors_cache[num_tokens]["current_tokens_slot_mapping_tensor"]
-            context_lens_tensor = self._input_tensors_cache[num_tokens]["context_lens_tensor"]
-            block_tables_tensor = self._input_tensors_cache[num_tokens]["block_tables_tensor"]
+            tokens_tensor = self._input_tensors_cache[num_tokens][
+                "tokens_tensor"]
+            positions_tensor = self._input_tensors_cache[num_tokens][
+                "positions_tensor"]
+            current_tokens_slot_mapping_tensor = self._input_tensors_cache[
+                num_tokens]["current_tokens_slot_mapping_tensor"]
+            context_lens_tensor = self._input_tensors_cache[num_tokens][
+                "context_lens_tensor"]
+            block_tables_tensor = self._input_tensors_cache[num_tokens][
+                "block_tables_tensor"]
 
         seq_data_dict: Dict[int, SequenceData] = {}
         for seq_group_metadata in seq_group_metadata_list:
@@ -500,7 +523,8 @@ class Worker:
 
         with self._sampler_e2e_timer:
             with self._sampler_launch_timer:
-                output = self.sampler(self.model.lm_head.weight, hidden_states, input_metadata)
+                output = self.sampler(self.model.lm_head.weight, hidden_states,
+                                      input_metadata)
             torch.cuda.synchronize()
 
         return output, end_time - start_time
@@ -516,17 +540,21 @@ class Worker:
 
     def start_profiling(self, activity) -> None:
         if activity == "cpu":
-            activities =[torch.profiler.ProfilerActivity.CPU,]
+            activities = [
+                torch.profiler.ProfilerActivity.CPU,
+            ]
         elif activity == "cuda":
-            activities =[torch.profiler.ProfilerActivity.CUDA,]
-        self.profiler = torch.profiler.profile(
-            activities=activities,
-        )
+            activities = [
+                torch.profiler.ProfilerActivity.CUDA,
+            ]
+        self.profiler = torch.profiler.profile(activities=activities, )
         self.profiler.__enter__()
 
     def stop_profiling(self, activity) -> None:
         self.profiler.__exit__(None, None, None)
-        self.profiler.export_chrome_trace(f"{self.metrics_config.output_dir}/profiler_trace_rank_{self.rank}_{activity}.json")
+        self.profiler.export_chrome_trace(
+            f"{self.metrics_config.output_dir}/profiler_trace_rank_{self.rank}_{activity}.json"
+        )
 
     def get_gpu_id(self) -> int:
         gpu_ids = ray.get_gpu_ids()
@@ -560,9 +588,10 @@ def _init_distributed_environment(
             init_method=distributed_init_method,
         )
 
-    print(f"Initializing nccl comm for rank {rank}, world size {parallel_config.world_size} with rendezvous id {rendezvous_id}")
+    print(
+        f"Initializing nccl comm for rank {rank}, world size {parallel_config.world_size} with rendezvous id {rendezvous_id}"
+    )
     init_nccl(parallel_config.world_size, rank, f"/tmp/comm_{rendezvous_id}")
-
 
     # A small all_reduce for warmup.
     torch.distributed.all_reduce(torch.zeros(1).cuda())

@@ -85,10 +85,12 @@ class PagedAttention(nn.Module):
 
         self._attn_prefill_qkv_reshape_timer = CudaTimer(
             OperationMetrics.ATTN_PREFILL_QKV_RESHAPE, layer_id)
-        self._attn_prefill_timer = CudaTimer(OperationMetrics.ATTN_PREFILL, layer_id)
+        self._attn_prefill_timer = CudaTimer(OperationMetrics.ATTN_PREFILL,
+                                             layer_id)
         self._attn_prefill_output_reshape_copy_timer = CudaTimer(
             OperationMetrics.ATTN_PREFILL_OUTPUT_RESHAPE_COPY, layer_id)
-        self._attn_decode_timer = CudaTimer(OperationMetrics.ATTN_DECODE, layer_id)
+        self._attn_decode_timer = CudaTimer(OperationMetrics.ATTN_DECODE,
+                                            layer_id)
         self._attn_kv_cache_save_timer = CudaTimer(
             OperationMetrics.ATTN_KV_CACHE_SAVE, layer_id)
         self._attn_prefill_kv_cache_prep_timer = CudaTimer(
@@ -358,7 +360,7 @@ class PagedAttention(nn.Module):
             # and value vectors will not be cached.
             num_valid_tokens = input_metadata.num_valid_tokens
             if (num_valid_tokens > 0 and key_cache is not None
-                    and value_cache is not None):                
+                    and value_cache is not None):
                 # The stride is 3 because the key and value are sliced from qkv.
                 cache_ops.reshape_and_cache(
                     key[:num_valid_tokens],
@@ -400,11 +402,8 @@ class PagedAttention(nn.Module):
                 self.single_query_cached_kv_attention(
                     output[num_current_prompt_tokens:num_valid_tokens],
                     query[num_current_prompt_tokens:num_valid_tokens],
-                    key_cache,
-                    value_cache,
-                    input_metadata,
-                    self.get_alibi_slopes()
-                )
+                    key_cache, value_cache, input_metadata,
+                    self.get_alibi_slopes())
 
         # Reshape the output tensor.
         # NOTE(woosuk): The output tensor may include paddings.
@@ -426,7 +425,11 @@ class PagedAttentionWithRoPE(PagedAttention):
         is_neox_style: bool = True,
         layer_id: int = None,
     ) -> None:
-        super().__init__(num_heads, head_size, scale, num_kv_heads, layer_id=layer_id)
+        super().__init__(num_heads,
+                         head_size,
+                         scale,
+                         num_kv_heads,
+                         layer_id=layer_id)
         self.is_neox_style = is_neox_style
 
         # Create the cos and sin cache.

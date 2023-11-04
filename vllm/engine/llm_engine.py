@@ -157,7 +157,7 @@ class LLMEngine:
         self.workers.append(worker)
 
         # generate random 32 bit integer for rendezvous id
-        rendezvous_id = random.randint(0, 2 ** 32 - 1) + self.replica_id
+        rendezvous_id = random.randint(0, 2**32 - 1) + self.replica_id
 
         self._run_workers(
             "init_model",
@@ -207,11 +207,11 @@ class LLMEngine:
                               None,
                               None,
                           ))
-        
+
         self._check_consecutive_gpu_allocation()
 
         # generate random 32 bit integer for rendezvous id
-        rendezvous_id = random.Random().randint(0, 2 ** 32 - 1) + self.replica_id
+        rendezvous_id = random.Random().randint(0, 2**32 - 1) + self.replica_id
 
         self._run_workers(
             "init_model",
@@ -601,7 +601,8 @@ class LLMEngine:
         start_time = time.perf_counter()
 
         with self._scheduler_timer:
-            seq_group_metadata_list, scheduler_outputs, ignored = self._schedule()
+            seq_group_metadata_list, scheduler_outputs, ignored = self._schedule(
+            )
 
         if scheduler_outputs.is_empty():
             return ignored
@@ -789,7 +790,7 @@ class LLMEngine:
         worker_metrics = self._run_workers(
             "get_metrics_store",
             get_all_outputs=True,
-        )        
+        )
         for worker_metric in worker_metrics:
             self.metrics_store.merge(worker_metric)
 

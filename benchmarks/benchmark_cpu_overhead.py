@@ -16,12 +16,14 @@ from vllm.metrics.constants import CpuOperationMetrics
 
 logger = logging.getLogger(__name__)
 
-
 PREFILL_SIZE = 1024
 NUM_DECODES = 50
 
 #MODELS = ["meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-70b-hf", "codellama/CodeLlama-34b-Instruct-hf", "tiiuae/falcon-7b", "tiiuae/falcon-40b"]
-MODELS = ["meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-70b-hf", "codellama/CodeLlama-34b-Instruct-hf"]
+MODELS = [
+    "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-70b-hf",
+    "codellama/CodeLlama-34b-Instruct-hf"
+]
 # MODELS = ["codellama/CodeLlama-34b-Instruct-hf"]
 BATCH_SIZES = list(range(8, 64 + 1, 8))
 TENSOR_PARALLEL_DEGREES = [1, 2, 4, 8]
@@ -35,14 +37,15 @@ def hex_to_binary(hex_identifier):
 
 class BenchmarkRunner:
 
-    def __init__(self, model_name, batch_size, tensor_parallel_degree, output_dir) -> None:
+    def __init__(self, model_name, batch_size, tensor_parallel_degree,
+                 output_dir) -> None:
         self._model_name = model_name
         self._batch_size = batch_size
         self._tensor_parallel_degree = tensor_parallel_degree
         self._output_dir = output_dir
 
         self._config_name = f"{model_name}_{batch_size}_{tensor_parallel_degree}"
-        
+
         self._llm = LLM(
             replica_id=0,
             # model config
@@ -87,7 +90,8 @@ class BenchmarkRunner:
 
         num_processed_requests = 0
         num_steps = 0
-        pbar = tqdm(total=num_requests, desc=f"{self._config_name} processed requests")
+        pbar = tqdm(total=num_requests,
+                    desc=f"{self._config_name} processed requests")
 
         self._llm.reset_metrics()
 
@@ -106,7 +110,9 @@ class BenchmarkRunner:
         end_time = time.time()
         pbar.close()
 
-        logger.info(f"{self._config_name} exiting after processing {num_requests} ({num_steps} iterations), Total time taken: {end_time - start_time:.2f} seconds")
+        logger.info(
+            f"{self._config_name} exiting after processing {num_requests} ({num_steps} iterations), Total time taken: {end_time - start_time:.2f} seconds"
+        )
 
         self._llm.pull_worker_metrics()
 
@@ -129,26 +135,25 @@ class BenchmarkRunner:
                 metric_store._cpu_operation_metrics[CpuOperationMetrics.SCHEDULE].sum +
                 metric_store._cpu_operation_metrics[CpuOperationMetrics.PROCESS_MODEL_OUTPUTS].sum
             ) + (
-                metric_store._cpu_operation_metrics[CpuOperationMetrics.SAMPLER_E2E].sum + 
-                metric_store._cpu_operation_metrics[CpuOperationMetrics.PREPARE_INPUTS_E2E].sum + 
+                metric_store._cpu_operation_metrics[CpuOperationMetrics.SAMPLER_E2E].sum +
+                metric_store._cpu_operation_metrics[CpuOperationMetrics.PREPARE_INPUTS_E2E].sum +
                 metric_store._cpu_operation_metrics[CpuOperationMetrics.MODEL_EXECUTION_E2E].sum +
                 metric_store._cpu_operation_metrics[CpuOperationMetrics.POST_PREPARE_INPUTS_BARRIER].sum
             ) / self._tensor_parallel_degree
 
-        total_recorded_cpu_time *= 1e-3 # convert to seconds
-        ray_comm_time = ((end_time - start_time) - total_recorded_cpu_time) / num_steps
-        ray_comm_time *= 1e3 # convert to ms
+        total_recorded_cpu_time *= 1e-3  # convert to seconds
+        ray_comm_time = (
+            (end_time - start_time) - total_recorded_cpu_time) / num_steps
+        ray_comm_time *= 1e3  # convert to ms
 
-        metrics.update(
-            {
-                "model_name": self._model_name,
-                "batch_size": self._batch_size,
-                "tensor_parallel_degree": self._tensor_parallel_degree,
-                "total_time": end_time - start_time,
-                "num_steps": num_steps,
-                "RAY_COMM_TIME": ray_comm_time,
-            }
-        )
+        metrics.update({
+            "model_name": self._model_name,
+            "batch_size": self._batch_size,
+            "tensor_parallel_degree": self._tensor_parallel_degree,
+            "total_time": end_time - start_time,
+            "num_steps": num_steps,
+            "RAY_COMM_TIME": ray_comm_time,
+        })
 
         del self._llm
         # trigger garbage collection
@@ -169,23 +174,24 @@ class BenchmarkRunner:
 
 
 class BenchmarkRunnerLauncher:
-    def _create_runner(self, model_name, batch_size, tensor_parallel_degree, output_dir) -> BenchmarkRunner:
+
+    def _create_runner(self, model_name, batch_size, tensor_parallel_degree,
+                       output_dir) -> BenchmarkRunner:
         placement_group_ids = list(ray.util.placement_group_table().keys())
         for placement_group_id in placement_group_ids:
             ray._private.worker.global_worker.core_worker.remove_placement_group(
-                ray.PlacementGroupID(hex_to_binary(placement_group_id))
-            )
+                ray.PlacementGroupID(hex_to_binary(placement_group_id)))
 
         print(ray.available_resources())
 
-        
         num_gpus = 0
         if tensor_parallel_degree == 1:
             num_gpus = 1
 
         runner_class = ray.remote(num_gpus=num_gpus)(BenchmarkRunner).remote
 
-        return runner_class(model_name, batch_size, tensor_parallel_degree, output_dir)
+        return runner_class(model_name, batch_size, tensor_parallel_degree,
+                            output_dir)
 
     def run(self):
         results = []
@@ -200,13 +206,17 @@ class BenchmarkRunnerLauncher:
 
             for batch_size in BATCH_SIZES:
                 try:
-                    runner = self._create_runner(model_name, batch_size, tensor_parallel_degree, output_dir)
+                    runner = self._create_runner(model_name, batch_size,
+                                                 tensor_parallel_degree,
+                                                 output_dir)
                     results.append(ray.get(runner.run.remote()))
                     del runner
                     # trigger garbage collection
                     gc.collect()
                 except Exception as e:
-                    logger.error(f"Failed to run {model_name}_{batch_size}_{tensor_parallel_degree} due to {e}")
+                    logger.error(
+                        f"Failed to run {model_name}_{batch_size}_{tensor_parallel_degree} due to {e}"
+                    )
                     break
 
         df = pd.DataFrame(results)

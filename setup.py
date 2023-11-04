@@ -102,8 +102,12 @@ all_reduce_extension = CUDAExtension(
         "cxx": CXX_FLAGS,
         "nvcc": NVCC_FLAGS,
     },
-    include_dirs=[f"{current_dir_path}/env/lib/python3.8/site-packages/nvidia/nccl/include"],
-    library_dirs=[f"{current_dir_path}/env/lib/python3.8/site-packages/nvidia/nccl/lib"],
+    include_dirs=[
+        f"{current_dir_path}/env/lib/python3.8/site-packages/nvidia/nccl/include"
+    ],
+    library_dirs=[
+        f"{current_dir_path}/env/lib/python3.8/site-packages/nvidia/nccl/lib"
+    ],
     # libraries=["nccl"],
 )
 ext_modules.append(all_reduce_extension)

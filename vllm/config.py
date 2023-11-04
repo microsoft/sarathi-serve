@@ -78,7 +78,7 @@ class ModelConfig:
         self.dtype = _get_and_verify_dtype(self.hf_config, dtype)
         self.max_model_len = _get_and_verify_max_len(self.hf_config,
                                                      max_model_len)
-        
+
         self.hf_config.skip_hidden_layers = skip_hidden_layers
 
         self._verify_load_format()
@@ -361,10 +361,10 @@ class MetricsConfig:
                  save_table_to_wandb: bool, wandb_project: str,
                  wandb_group: str, wandb_run_name: str,
                  enable_op_level_metrics: bool, enable_chrome_trace: bool,
-                 enable_request_outputs: bool, enable_cpu_op_level_metrics: bool,
+                 enable_request_outputs: bool,
+                 enable_cpu_op_level_metrics: bool,
                  enable_high_level_cuda_metrics: bool,
-                 tensor_parallel_size: int,
-                 model_num_layers: int) -> None:
+                 tensor_parallel_size: int, model_num_layers: int) -> None:
         self.write_metrics = write_metrics
         self.output_dir = output_dir
         self.subsamples = subsamples
@@ -379,6 +379,7 @@ class MetricsConfig:
         self.enable_high_level_cuda_metrics = enable_high_level_cuda_metrics
         self.tensor_parallel_size = tensor_parallel_size
         self.model_num_layers = model_num_layers
+
 
 _STR_DTYPE_TO_TORCH_DTYPE = {
     "half": torch.float16,

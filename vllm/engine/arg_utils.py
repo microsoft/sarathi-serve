@@ -328,7 +328,8 @@ class EngineArgs:
                                    self.tokenizer_mode, self.trust_remote_code,
                                    self.download_dir, self.load_format,
                                    self.dtype, self.seed, self.revision,
-                                   self.max_model_len, self.quantization, self.skip_hidden_layers)
+                                   self.max_model_len, self.quantization,
+                                   self.skip_hidden_layers)
         cache_config = CacheConfig(self.block_size,
                                    self.gpu_memory_utilization,
                                    self.swap_space)
@@ -339,11 +340,10 @@ class EngineArgs:
         metrics_config = MetricsConfig(
             self.write_metrics, self.output_dir, self.subsamples,
             self.save_table_to_wandb, self.wandb_project, self.wandb_group,
-            self.wandb_run_name,
-            self.enable_op_level_metrics, self.enable_chrome_trace,
-            self.enable_request_outputs, self.enable_cpu_op_level_metrics,
-            self.enable_high_level_cuda_metrics,
-            self.tensor_parallel_size,
+            self.wandb_run_name, self.enable_op_level_metrics,
+            self.enable_chrome_trace, self.enable_request_outputs,
+            self.enable_cpu_op_level_metrics,
+            self.enable_high_level_cuda_metrics, self.tensor_parallel_size,
             model_config.hf_config.num_hidden_layers)
         return model_config, cache_config, parallel_config, scheduler_config, metrics_config
 

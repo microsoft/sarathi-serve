@@ -25,7 +25,7 @@ class BenchmarkRunner:
 
         self._num_replicas = self._config.cluster_num_replicas
 
-        output_dir=f"{self._config.output_dir}/replica_{replica_id}"
+        output_dir = f"{self._config.output_dir}/replica_{replica_id}"
         os.makedirs(output_dir, exist_ok=True)
 
         set_seeds(config.seed)
@@ -69,10 +69,14 @@ class BenchmarkRunner:
             wandb_run_name=None,
             subsamples=self._config.metrics_store_subsamples,
             save_table_to_wandb=self._config.metrics_store_save_table_to_wandb,
-            enable_op_level_metrics=self._config.metrics_store_enable_op_level_metrics,
-            enable_request_outputs=self._config.metrics_store_enable_request_outputs,
-            enable_cpu_op_level_metrics=self._config.metrics_store_enable_cpu_op_level_metrics,
-            enable_high_level_cuda_metrics=self._config.metrics_store_enable_high_level_cuda_metrics,
+            enable_op_level_metrics=self._config.
+            metrics_store_enable_op_level_metrics,
+            enable_request_outputs=self._config.
+            metrics_store_enable_request_outputs,
+            enable_cpu_op_level_metrics=self._config.
+            metrics_store_enable_cpu_op_level_metrics,
+            enable_high_level_cuda_metrics=self._config.
+            metrics_store_enable_high_level_cuda_metrics,
             # vllm engine config
             disable_log_stats=True,
             trust_remote_code=True,
@@ -101,7 +105,8 @@ class BenchmarkRunner:
 
         num_processed_requests = 0
         num_steps = 0
-        pbar = tqdm(total=len(self._requests), desc=f"Replica {self._replica_id} processed requests")
+        pbar = tqdm(total=len(self._requests),
+                    desc=f"Replica {self._replica_id} processed requests")
         start_time = time.time()
 
         # Run the engine.
@@ -117,7 +122,9 @@ class BenchmarkRunner:
         end_time = time.time()
         pbar.close()
 
-        logger.info(f"Replica {self._replica_id} exiting after processing {len(self._requests)} ({num_steps} iterations), Total time taken: {end_time - start_time:.2f} seconds")
+        logger.info(
+            f"Replica {self._replica_id} exiting after processing {len(self._requests)} ({num_steps} iterations), Total time taken: {end_time - start_time:.2f} seconds"
+        )
 
         if self._config.enable_profiling:
             self._llm.stop_profiling()
@@ -158,9 +165,10 @@ class BenchmarkRunner:
 
 
 class BenchmarkRunnerLauncher:
+
     def __init__(self, config: Config) -> None:
         self._config = config
-        
+
         ray.init()
 
         self._validate_cluster_resources()
@@ -188,7 +196,8 @@ class BenchmarkRunnerLauncher:
         if self._config.model_tensor_parallel_degree == 1:
             num_gpus = 1
 
-        runner_class = ray.remote(num_cpus=num_cpus, num_gpus=num_gpus)(BenchmarkRunner).remote
+        runner_class = ray.remote(num_cpus=num_cpus,
+                                  num_gpus=num_gpus)(BenchmarkRunner).remote
 
         runners = []
 
@@ -206,11 +215,15 @@ class BenchmarkRunnerLauncher:
             wandb_run_name=self._config.metrics_store_wandb_run_name,
             subsamples=self._config.metrics_store_subsamples,
             save_table_to_wandb=self._config.metrics_store_save_table_to_wandb,
-            enable_op_level_metrics=self._config.metrics_store_enable_op_level_metrics,
+            enable_op_level_metrics=self._config.
+            metrics_store_enable_op_level_metrics,
             enable_chrome_trace=self._config.write_chrome_trace,
-            enable_request_outputs=self._config.metrics_store_enable_request_outputs,
-            enable_cpu_op_level_metrics=self._config.metrics_store_enable_cpu_op_level_metrics,
-            enable_high_level_cuda_metrics=self._config.metrics_store_enable_high_level_cuda_metrics,
+            enable_request_outputs=self._config.
+            metrics_store_enable_request_outputs,
+            enable_cpu_op_level_metrics=self._config.
+            metrics_store_enable_cpu_op_level_metrics,
+            enable_high_level_cuda_metrics=self._config.
+            metrics_store_enable_high_level_cuda_metrics,
             tensor_parallel_size=self._config.model_tensor_parallel_degree,
             model_num_layers=self._config.model_num_layers,
         )
@@ -220,8 +233,9 @@ class BenchmarkRunnerLauncher:
     def run(self):
         ray.get([runner.warmup.remote() for runner in self._runners])
 
-        runner_metrics = ray.get([runner.run.remote() for runner in self._runners])
-        
+        runner_metrics = ray.get(
+            [runner.run.remote() for runner in self._runners])
+
         for runner_metric in runner_metrics:
             self._aggregate_metric_store.merge(runner_metric)
 

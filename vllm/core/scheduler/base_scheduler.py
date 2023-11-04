@@ -72,7 +72,8 @@ class SchedulerOutputs:
             seq_group.request_id for seq_group in self.scheduled_seq_groups
         ]
 
-    def to_chrome_trace_dict(self, replica_id: int, start_time: float, end_time: float) -> Dict:
+    def to_chrome_trace_dict(self, replica_id: int, start_time: float,
+                             end_time: float) -> Dict:
         return {
             "name": f"{self.request_ids}",
             "ph": "X",

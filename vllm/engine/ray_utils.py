@@ -111,10 +111,12 @@ def initialize_cluster(
                 "The number of required GPUs exceeds the total number of "
                 "available GPUs in the cluster.")
         # Create a new placement group
-        current_placement_group = ray.util.placement_group([{
-            "GPU": 1,
-            f"node:{node_ip_address}": 0.01
-        }] * parallel_config.world_size, strategy="STRICT_PACK")
+        current_placement_group = ray.util.placement_group(
+            [{
+                "GPU": 1,
+                f"node:{node_ip_address}": 0.01
+            }] * parallel_config.world_size,
+            strategy="STRICT_PACK")
         # Wait until PG is ready - this will block until all
         # requested resources are available, and will timeout
         # if they cannot be provisioned.
