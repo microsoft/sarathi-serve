@@ -51,8 +51,8 @@ class OPTLearnedPositionalEmbedding(nn.Embedding):
         self.offset = 2
         super().__init__(num_embeddings + self.offset, embedding_dim)
 
-    def forward(self, positions: torch.Tensor):
-        return super().forward(positions + self.offset)
+    def forward(self, input: torch.Tensor):
+        return super().forward(input + self.offset)
 
 
 class OPTAttention(nn.Module):

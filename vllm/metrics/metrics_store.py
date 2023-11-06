@@ -511,7 +511,7 @@ class MetricsStore(metaclass=Singleton):
             json.dump(
                 [asdict(response) for response in self._requests_outputs],
                 f,
-                indent='\t')
+                indent="\t")
 
     def _store_operation_metrics(self, base_plot_path: str):
         if not self._enable_op_level_metrics and \
@@ -552,7 +552,7 @@ class MetricsStore(metaclass=Singleton):
             dataseries.plot_cdf(base_plot_path,
                                 f"{dataseries._metric_name}_execution_time",
                                 TIME_STR_MS)
-            if dataseries._metric_name == "schedule" or dataseries._metric_name == "process_model_outputs":
+            if dataseries._metric_name in ("schedule", "process_model_outputs"):
                 normalized_time = dataseries.sum
             else:
                 normalized_time = dataseries.sum / self._tensor_parallel_size

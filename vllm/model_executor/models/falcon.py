@@ -32,7 +32,7 @@ from vllm.model_executor.input_metadata import InputMetadata
 from vllm.model_executor.layers.attention import (PagedAttention,
                                                   PagedAttentionWithALiBi,
                                                   PagedAttentionWithRoPE)
-from vllm.model_executor.layers.sampler import Sampler
+#from vllm.model_executor.layers.sampler import Sampler
 from vllm.model_executor.weight_utils import (convert_pyslice_to_tensor,
                                               hf_model_weights_iterator,
                                               load_tensor_parallel_weights)
@@ -44,9 +44,6 @@ from vllm.model_executor.parallel_utils.tensor_parallel import (
 from vllm.sequence import SamplerOutput
 from vllm.transformers_utils.configs import RWConfig
 
-from vllm.metrics.constants import OperationMetrics
-from vllm.metrics.cuda_timer import CudaTimer
-
 KVCache = Tuple[torch.Tensor, torch.Tensor]
 FalconConfig = Union[HF_FalconConfig, RWConfig]
 
@@ -57,8 +54,8 @@ FalconConfig = Union[HF_FalconConfig, RWConfig]
 # we keep these characteristics in the final model.
 class FalconLinear(nn.Linear):
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        hidden_states = x @ self.weight.T
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        hidden_states = input @ self.weight.T
         if self.bias is None:
             return hidden_states
         return hidden_states + self.bias

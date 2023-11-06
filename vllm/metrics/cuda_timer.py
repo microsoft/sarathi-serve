@@ -8,7 +8,7 @@ class CudaTimer:
 
     def __init__(self, name: OperationMetrics, layer_id: int = 0):
         self.name = name
-        self.metrics_store = MetricsStore()
+        self.metrics_store = MetricsStore(None)
         self.disabled = (not self.metrics_store.is_op_enabled(self.name)
                          or layer_id != 0)
 

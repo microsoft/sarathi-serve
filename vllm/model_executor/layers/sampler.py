@@ -2,7 +2,7 @@
 from typing import Dict, List, Optional, Tuple
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from vllm.model_executor.input_metadata import InputMetadata
 from vllm.model_executor.parallel_utils.tensor_parallel import (

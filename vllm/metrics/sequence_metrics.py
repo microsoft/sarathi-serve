@@ -168,7 +168,7 @@ class SequenceMetrics:
                 self._preempted_time += current_time - self._last_restart_at
 
             self._last_execution_start_at = current_time
-        elif status == SequenceStatus.FINISHED_IGNORED or status == SequenceStatus.FINISHED_ABORTED:
+        elif status in (SequenceStatus.FINISHED_IGNORED, SequenceStatus.FINISHED_ABORTED):
             self._is_ignore_finished = True
             self._is_completed = True
             self._completed_at = current_time
@@ -183,7 +183,7 @@ class SequenceMetrics:
             self, current_time: float, status: SequenceStatus) -> None:
         self._execution_time += current_time - self._last_execution_start_at
 
-        if status == SequenceStatus.FINISHED_STOPPED or status == SequenceStatus.FINISHED_LENGTH_CAPPED:
+        if status in (SequenceStatus.FINISHED_STOPPED, SequenceStatus.FINISHED_LENGTH_CAPPED):
             self._is_completed = True
             self._completed_at = current_time
         elif status == SequenceStatus.FINISHED_ABORTED:

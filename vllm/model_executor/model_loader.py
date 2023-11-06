@@ -3,7 +3,7 @@ import contextlib
 from typing import Type
 
 import torch
-import torch.nn as nn
+from torch import nn
 from transformers import PretrainedConfig
 
 from vllm.config import ModelConfig

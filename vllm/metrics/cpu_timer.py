@@ -9,7 +9,7 @@ class CpuTimer:
     def __init__(self, name: CpuOperationMetrics):
         self.name = name
         self.start_time = None
-        self.metrics_store = MetricsStore()
+        self.metrics_store = MetricsStore(None)
         self.disabled = not self.metrics_store.is_op_enabled(self.name)
 
     def __enter__(self):

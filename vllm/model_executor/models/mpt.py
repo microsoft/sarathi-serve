@@ -4,7 +4,7 @@ import math
 from typing import List, Optional, Tuple
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from vllm.model_executor.input_metadata import InputMetadata
 from vllm.model_executor.layers.activation import get_act_fn
