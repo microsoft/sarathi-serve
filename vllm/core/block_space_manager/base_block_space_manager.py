@@ -94,8 +94,7 @@ class BaseBlockSpaceManager(ABC):
         num_required_blocks = self.get_num_initial_blocks(seq)
         num_free_gpu_blocks = self.gpu_allocator.get_num_free_blocks()
         # Use watermark to avoid frequent cache eviction.
-        return (num_free_gpu_blocks - num_required_blocks
-                >= self.watermark_blocks)
+        return num_free_gpu_blocks - num_required_blocks >= self.watermark_blocks
 
     def allocate(self, seq_group: SequenceGroup) -> None:
         # NOTE: Here we assume that all sequences in the group have the same

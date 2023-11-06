@@ -175,7 +175,8 @@ class Sequence:
         chunk_size: Optional[int] = None,
     ) -> None:
         assert token_id in logprobs
-        was_prompt_processing_finished =  self.data.is_prompt_processing_finished()
+        was_prompt_processing_finished = self.data.is_prompt_processing_finished(
+        )
 
         # the token need not be appended to the sequence
         # when processing partial prefill chunks

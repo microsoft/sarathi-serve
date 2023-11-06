@@ -154,7 +154,8 @@ disable=abstract-method,
 	protected-access,
 	unsubscriptable-object,
 	invalid-all-object,
-	redefined-builtin
+	redefined-builtin,
+	consider-using-in
 
 
 [REPORTS]
