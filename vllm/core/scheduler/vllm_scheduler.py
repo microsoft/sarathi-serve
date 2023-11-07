@@ -70,15 +70,13 @@ class VLLMScheduler(BaseScheduler):
                     break
 
                 # If the number of batched tokens exceeds the limit, stop.
-                if (num_batched_tokens + num_prompt_tokens
-                        > self.scheduler_config.max_num_batched_tokens):
+                if num_batched_tokens + num_prompt_tokens > self.scheduler_config.max_num_batched_tokens:
                     break
 
                 # The total number of sequences in the RUNNING state should not
                 # exceed the maximum number of sequences.
                 num_new_seqs = seq_group.get_max_num_running_seqs()
-                if (num_curr_seqs + num_new_seqs
-                        > self.scheduler_config.max_num_seqs):
+                if num_curr_seqs + num_new_seqs > self.scheduler_config.max_num_seqs:
                     break
 
                 seq_group = self.waiting.pop(0)
@@ -153,8 +151,7 @@ class VLLMScheduler(BaseScheduler):
                 # The total number of sequences in the RUNNING state should not
                 # exceed the maximum number of sequences.
                 num_new_seqs = seq_group.get_max_num_running_seqs()
-                if (num_curr_seqs + num_new_seqs
-                        > self.scheduler_config.max_num_seqs):
+                if num_curr_seqs + num_new_seqs > self.scheduler_config.max_num_seqs:
                     break
 
                 seq_group = self.swapped.pop(0)

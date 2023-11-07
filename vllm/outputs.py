@@ -25,7 +25,7 @@ class CompletionOutput:
     cumulative_logprob: float
     logprobs: Optional[List[Dict[int, float]]] = None
     probs: Optional[List[List[float]]] = None
-    finish_reason: Optional[str] = None,
+    finish_reason: Optional[str] = None
 
     def finished(self) -> bool:
         return self.finish_reason is not None

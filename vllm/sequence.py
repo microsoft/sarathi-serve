@@ -41,7 +41,7 @@ class SequenceData:
             self.cumulative_logprob += logprob
             return True
 
-        assert (chunk_size > 0)
+        assert chunk_size > 0
         self.prompt_tokens_processed += chunk_size
         assert self.prompt_tokens_processed <= len(self.prompt_token_ids)
 

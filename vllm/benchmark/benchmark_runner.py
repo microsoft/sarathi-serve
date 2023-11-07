@@ -151,7 +151,7 @@ class BenchmarkRunner:
 
         last_request_arrival_time = 0
 
-        for i, request in enumerate(self._requests):
+        for request in self._requests:
             time.sleep(request.arrived_at - last_request_arrival_time)
 
             self._llm._add_request(**self._get_input_params(request))

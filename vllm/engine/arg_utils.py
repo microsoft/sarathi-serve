@@ -66,7 +66,7 @@ class EngineArgs:
                 if self.max_model_len is not None else True)
         if self.write_metrics:
             os.makedirs(self.output_dir, exist_ok=True)
-            with open(f"{self.output_dir}/config.yml", 'w') as f:
+            with open(f'{self.output_dir}/config.yml', 'w') as f:
                 yaml.dump(asdict(self),
                           f,
                           default_flow_style=False,
@@ -198,7 +198,7 @@ class EngineArgs:
                             default=EngineArgs.chunk_size,
                             help='size of each prefill chunk used in sarathi')
         parser.add_argument('--enable-rolling-prefills',
-                            action="store_true",
+                            action='store_true',
                             default=EngineArgs.enable_rolling_prefills,
                             help='enable rolling prefill in sarathi')
         parser.add_argument(

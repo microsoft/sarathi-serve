@@ -511,7 +511,7 @@ class MetricsStore(metaclass=Singleton):
             json.dump(
                 [asdict(response) for response in self._requests_outputs],
                 f,
-                indent='\t')
+                indent="\t")
 
     def _store_operation_metrics(self, base_plot_path: str):
         if not self._enable_op_level_metrics and \

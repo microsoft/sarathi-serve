@@ -1,4 +1,4 @@
-import random
+#import random
 from typing import Tuple
 
 from vllm.benchmark.request_generator.base_request_length_generator import (
