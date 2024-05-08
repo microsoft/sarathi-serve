@@ -44,7 +44,8 @@ pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cu121
 
 ### Update NCCL
 
-NCCL 2.19 which ships with torch 2.2 by default is buggy, update NCCL to the latest (2.21),
+NCCL 2.19 which ships with torch 2.2 by default is buggy, update NCCL to the latest (2.21).
+This setup may need to be repeated after the `Install Sarathi-Serve` step is done.
 
 ```sh
 pip install -U nvidia-nccl-cu12

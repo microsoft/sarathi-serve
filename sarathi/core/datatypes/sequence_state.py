@@ -206,7 +206,7 @@ class SequenceState:
 
         if status in [
                 SequenceStatus.FINISHED_STOPPED,
-                status == SequenceStatus.FINISHED_LENGTH_CAPPED
+                SequenceStatus.FINISHED_LENGTH_CAPPED
         ]:
             self._is_completed = True
             self._completed_at = current_time
