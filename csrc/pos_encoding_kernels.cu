@@ -3,7 +3,7 @@
 
 #include "dispatch_utils.h"
 
-namespace vllm {
+namespace sarathi {
 
 template<typename scalar_t, bool IS_NEOX>
 inline __device__ void apply_rotary_embedding(
@@ -75,7 +75,7 @@ __global__ void rotary_embedding_kernel(
   }
 }
 
-} // namespace vllm
+} // namespace sarathi
 
 void rotary_embedding(
   torch::Tensor& positions,         // [num_tokens]
@@ -84,7 +84,7 @@ void rotary_embedding(
   int head_size,
   torch::Tensor& cos_sin_cache,     // [max_position, rot_dim]
   bool is_neox) {
-  int num_tokens = query.size(0);
+  int64_t num_tokens = query.size(0);
   int rot_dim = cos_sin_cache.size(1);
   int num_heads = query.size(1) / head_size;
   int num_kv_heads = key.size(1) / head_size;
@@ -94,12 +94,12 @@ void rotary_embedding(
   dim3 grid(num_tokens);
   dim3 block(std::min(num_heads * rot_dim / 2, 512));
   const cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  VLLM_DISPATCH_FLOATING_TYPES(
+  SARATHI_DISPATCH_FLOATING_TYPES(
     query.scalar_type(),
     "rotary_embedding",
     [&] {
       if (is_neox) {
-        vllm::rotary_embedding_kernel<scalar_t, true><<<grid, block, 0, stream>>>(
+        sarathi::rotary_embedding_kernel<scalar_t, true><<<grid, block, 0, stream>>>(
           positions.data_ptr<int64_t>(),
           query.data_ptr<scalar_t>(),
           key.data_ptr<scalar_t>(),
@@ -111,7 +111,7 @@ void rotary_embedding(
           num_kv_heads,
           head_size);
       } else {
-        vllm::rotary_embedding_kernel<scalar_t, false><<<grid, block, 0, stream>>>(
+        sarathi::rotary_embedding_kernel<scalar_t, false><<<grid, block, 0, stream>>>(
           positions.data_ptr<int64_t>(),
           query.data_ptr<scalar_t>(),
           key.data_ptr<scalar_t>(),

@@ -91,52 +91,9 @@ if nvcc_cuda_version >= Version("11.2"):
 
 ext_modules = []
 
-current_dir_path = os.path.dirname(os.path.realpath(__file__))
-
-all_reduce_extension = CUDAExtension(
-    name="vllm.all_reduce_ops",
-    sources=[
-        "csrc/all_reduce.cpp",
-    ],
-    extra_compile_args={
-        "cxx": CXX_FLAGS,
-        "nvcc": NVCC_FLAGS,
-    },
-    include_dirs=[
-        f"{current_dir_path}/env/lib/python3.8/site-packages/nvidia/nccl/include"
-    ],
-    library_dirs=[
-        f"{current_dir_path}/env/lib/python3.8/site-packages/nvidia/nccl/lib"
-    ],
-    # libraries=["nccl"],
-)
-ext_modules.append(all_reduce_extension)
-
-# Cache operations.
-cache_extension = CUDAExtension(
-    name="vllm.cache_ops",
-    sources=["csrc/cache.cpp", "csrc/cache_kernels.cu"],
-    extra_compile_args={
-        "cxx": CXX_FLAGS,
-        "nvcc": NVCC_FLAGS,
-    },
-)
-ext_modules.append(cache_extension)
-
-# Attention kernels.
-attention_extension = CUDAExtension(
-    name="vllm.attention_ops",
-    sources=["csrc/attention.cpp", "csrc/attention/attention_kernels.cu"],
-    extra_compile_args={
-        "cxx": CXX_FLAGS,
-        "nvcc": NVCC_FLAGS,
-    },
-)
-ext_modules.append(attention_extension)
-
 # Positional encoding kernels.
 positional_encoding_extension = CUDAExtension(
-    name="vllm.pos_encoding_ops",
+    name="sarathi.pos_encoding_ops",
     sources=["csrc/pos_encoding.cpp", "csrc/pos_encoding_kernels.cu"],
     extra_compile_args={
         "cxx": CXX_FLAGS,
@@ -147,7 +104,7 @@ ext_modules.append(positional_encoding_extension)
 
 # Layer normalization kernels.
 layernorm_extension = CUDAExtension(
-    name="vllm.layernorm_ops",
+    name="sarathi.layernorm_ops",
     sources=["csrc/layernorm.cpp", "csrc/layernorm_kernels.cu"],
     extra_compile_args={
         "cxx": CXX_FLAGS,
@@ -158,7 +115,7 @@ ext_modules.append(layernorm_extension)
 
 # Activation kernels.
 activation_extension = CUDAExtension(
-    name="vllm.activation_ops",
+    name="sarathi.activation_ops",
     sources=["csrc/activation.cpp", "csrc/activation_kernels.cu"],
     extra_compile_args={
         "cxx": CXX_FLAGS,
@@ -166,20 +123,6 @@ activation_extension = CUDAExtension(
     },
 )
 ext_modules.append(activation_extension)
-
-# Quantization kernels.
-quantization_extension = CUDAExtension(
-    name="vllm.quantization_ops",
-    sources=[
-        "csrc/quantization.cpp",
-        "csrc/quantization/awq/gemm_kernels.cu",
-    ],
-    extra_compile_args={
-        "cxx": CXX_FLAGS,
-        "nvcc": NVCC_FLAGS,
-    },
-)
-ext_modules.append(quantization_extension)
 
 
 def get_path(*filepath) -> str:
@@ -212,30 +155,21 @@ def get_requirements() -> List[str]:
 
 
 setuptools.setup(
-    name="vllm",
-    version=find_version(get_path("vllm", "__init__.py")),
-    author="vLLM Team",
+    name="sarathi",
+    version=find_version(get_path("sarathi", "__init__.py")),
+    author="Sarathi Team",
     license="Apache 2.0",
-    description=("A high-throughput and memory-efficient inference and "
-                 "serving engine for LLMs"),
+    description=("A high-throughput and low-latency serving engine for LLMs"),
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/vllm-project/vllm",
-    project_urls={
-        "Homepage": "https://github.com/vllm-project/vllm",
-        "Documentation": "https://vllm.readthedocs.io/en/latest/",
-    },
+    url="https://github.com/microsoft/sarathi",
     classifiers=[
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: Apache Software License",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
-    packages=setuptools.find_packages(exclude=("benchmarks", "csrc", "docs",
-                                               "examples", "tests")),
-    python_requires=">=3.8",
+    packages=setuptools.find_packages(exclude=("benchmarks", "csrc")),
+    python_requires=">=3.10",
     install_requires=get_requirements(),
     ext_modules=ext_modules,
     cmdclass={"build_ext": BuildExtension},

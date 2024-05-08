@@ -123,6 +123,9 @@ celerybeat.pid
 .env
 .venv
 env/
+env_sarathi/
+env_flashinfer/
+env_flashinfer_2/
 venv/
 ENV/
 env.bak/
@@ -181,5 +184,16 @@ _build/
 # Custom
 datasets/**/*.json
 datasets/**/*.svg
+old
 outputs
 wandb
+benchmark_output
+benchmark_output_old
+benchmark_output_old_1
+offline_inference_output
+capacity_search_output*
+isoqps_output*
+profiling_output
+env_vidur
+high_tail_latency_output
+profiling_outputs

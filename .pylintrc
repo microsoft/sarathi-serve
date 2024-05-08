@@ -8,7 +8,7 @@
 [MASTER]
 
 # Files or directories to be skipped. They should be base names, not paths.
-ignore=docs,parallel_utils
+ignore=parallel_utils
 
 # Files or directories matching the regex patterns are skipped. The regex
 # matches against base names, not paths.
@@ -85,15 +85,15 @@ disable=abstract-method,
         intern-builtin,
         invalid-str-codec,
         locally-disabled,
-        logging-fstring-interpolation,  # added by vLLM
-        logging-not-lazy,  # added by vLLM
+        logging-fstring-interpolation,  # added by Sarathi
+        logging-not-lazy,  # added by Sarathi
         long-builtin,
         long-suffix,
         map-builtin-not-iterating,
         misplaced-comparison-constant,
-        missing-class-docstring,  # TODO (vLLM): enable
+        missing-class-docstring,  # TODO (Sarathi): enable
         missing-function-docstring,
-        missing-module-docstring,  # TODO (vLLM): enable
+        missing-module-docstring,  # TODO (Sarathi): enable
         metaclass-assignment,
         next-method-called,
         next-method-defined,
@@ -151,11 +151,6 @@ disable=abstract-method,
         wrong-import-order,
         xrange-builtin,
         zip-builtin-not-iterating,
-	protected-access,
-	unsubscriptable-object,
-	invalid-all-object,
-	redefined-builtin,
-	consider-using-in
 
 
 [REPORTS]
@@ -269,7 +264,7 @@ generated-members=
 [FORMAT]
 
 # Maximum number of characters on a single line.
-max-line-length=180
+max-line-length=80
 
 # TODO(https://github.com/PyCQA/pylint/issues/3352): Direct pylint to exempt
 # lines made too long by directives to pytype.

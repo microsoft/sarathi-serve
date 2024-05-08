@@ -23,7 +23,6 @@ builtin cd "$ROOT" || exit 1
 
 YAPF_VERSION=$(yapf --version | awk '{print $2}')
 PYLINT_VERSION=$(pylint --version | head -n 1 | awk '{print $2}')
-MYPY_VERSION=$(mypy --version | awk '{print $2}')
 
 # # params: tool name, tool version, required version
 tool_version_check() {
@@ -35,7 +34,6 @@ tool_version_check() {
 
 tool_version_check "yapf" $YAPF_VERSION "$(grep yapf requirements-dev.txt | cut -d'=' -f3)"
 tool_version_check "pylint" $PYLINT_VERSION "$(grep "pylint==" requirements-dev.txt | cut -d'=' -f3)"
-tool_version_check "mypy" "$MYPY_VERSION" "$(grep mypy requirements-dev.txt | cut -d'=' -f3)"
 
 YAPF_FLAGS=(
     '--recursive'
@@ -44,7 +42,7 @@ YAPF_FLAGS=(
 
 YAPF_EXCLUDES=(
     '--exclude' 'build/**'
-    '--exclude' 'vllm/model_executor/parallel_utils/**'
+    '--exclude' 'sarathi/model_executor/parallel_utils/**'
 )
 
 # Format specified files
@@ -72,7 +70,7 @@ format_changed() {
 
 # Format all files
 format_all() {
-    yapf --in-place "${YAPF_FLAGS[@]}" "${YAPF_EXCLUDES[@]}" vllm
+    yapf --in-place "${YAPF_FLAGS[@]}" "${YAPF_EXCLUDES[@]}" sarathi
 }
 
 ## This flag formats individual files. --files *must* be the first command line
@@ -87,16 +85,11 @@ else
    # Format only the files that changed in last commit.
    format_changed
 fi
-echo 'vLLM yapf: Done'
-
-# Run mypy
-# TODO(zhuohan): Enable mypy
-# echo 'vLLM mypy:'
-# mypy
+echo 'Sarathi yapf: Done'
 
 # Run Pylint
-echo 'vLLM Pylint:'
-pylint vllm
+echo 'Sarathi Pylint:'
+pylint sarathi
 
 if ! git diff --quiet &>/dev/null; then
     echo 'Reformatted files. Please review and stage the changes.'
