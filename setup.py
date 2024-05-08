@@ -162,7 +162,7 @@ setuptools.setup(
     description=("A high-throughput and low-latency serving engine for LLMs"),
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    url=https://github.com/microsoft/sarath",
+    url="https://github.com/microsoft/sarathi",
     classifiers=[
         "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: Apache Software License",

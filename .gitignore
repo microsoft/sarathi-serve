@@ -193,7 +193,6 @@ benchmark_output_old_1
 offline_inference_output
 capacity_search_output*
 isoqps_output*
-third_party
 profiling_output
 env_vidur
 high_tail_latency_output

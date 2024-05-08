@@ -1,6 +1,7 @@
 # Sarathi-Serve
 
-This is the official OSDI'24 artifact submission for paper #444, "Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve”.
+This repository contains the code for [Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve](https://arxiv.org/abs/2403.02310).
+This codebase also serves as the baseline for fidelity tests for the LLM inference system simulator [Vidur](https://github.com/microsoft/vidur).
 
 ## Setup
 
@@ -58,15 +59,11 @@ python setup.py install
 pip install -e . --extra-index-url https://flashinfer.ai/whl/cu121/torch2.2/
 ```
 
-## Reproducing Results
-
-Refer to readmes in individual folders corresponding to each figure in `osdi-experiments`.
-
 ## Citation
 
 If you use our work, please consider citing our paper:
 
-```
+```latex
 @article{agrawal2024taming,
   title={Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve},
   author={Agrawal, Amey and Kedia, Nitin and Panwar, Ashish and Mohan, Jayashree and Kwatra, Nipun and Gulavani, Bhargav S and Tumanov, Alexey and Ramjee, Ramachandran},
@@ -78,7 +75,6 @@ If you use our work, please consider citing our paper:
 ## Acknowledgment
 
 This repository originally started as a fork of the [vLLM project](https://vllm-project.github.io/). Sarathi-Serve is a research prototype and does not have complete feature parity with open-source vLLM. We have only retained the most critical features and adopted the codebase for faster research iterations.
-
 
 ## Contributing
 
