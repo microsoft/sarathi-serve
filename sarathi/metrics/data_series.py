@@ -49,8 +49,6 @@ class DataSeries:
         self.data_series = sorted(self.data_series, key=lambda x: x[0])
         self._last_data_y = self.data_series[-1][1]
 
-
-
     # This function assumes that x's are unique
     # in their own dataseries respectively.
     def elementwise_merge(self, other: "DataSeries"):
@@ -293,7 +291,7 @@ class DataSeries:
         # ourselves and then use wandb bar chart
 
         histogram_df = df[self.y_name].value_counts(bins=25,
-                                                     sort=False).sort_index()
+                                                    sort=False).sort_index()
         histogram_df = histogram_df.reset_index()
         histogram_df.columns = ["Bins", "count"]
         histogram_df["Bins"] = histogram_df["Bins"].apply(lambda x: x.mid)

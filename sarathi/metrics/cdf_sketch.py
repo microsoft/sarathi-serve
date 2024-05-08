@@ -41,7 +41,7 @@ class CDFSketch:
     @property
     def sum(self) -> float:
         return self.sketch.sum
-    
+
     def __len__(self):
         return int(self.sketch.count)
 

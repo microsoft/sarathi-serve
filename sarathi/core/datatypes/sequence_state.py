@@ -142,7 +142,7 @@ class SequenceState:
     @property
     def execution_plus_preemption_time_normalized(self) -> float:
         return self.execution_plus_preemption_time / self._num_output_tokens
-    
+
     @property
     def last_token_generation_time(self) -> float:
         return self._last_token_generation_time

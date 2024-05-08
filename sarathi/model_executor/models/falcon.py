@@ -415,8 +415,7 @@ class FalconForCausalLM(nn.Module):
             )
             hidden_states = recv(hidden_states)
 
-        hidden_states = self.transformer(hidden_states, positions,
-                                            kv_caches)
+        hidden_states = self.transformer(hidden_states, positions, kv_caches)
 
         if not self.is_pipeline_last_stage:
             send(hidden_states)

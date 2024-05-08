@@ -180,6 +180,7 @@ class ModelConfig:
     def get_total_num_layers(self) -> int:
         return self.hf_config.num_hidden_layers
 
+
 class CacheConfig:
     """Configuration for the KV cache.
 
@@ -382,9 +383,11 @@ class MetricsConfig:
     def __init__(self, replica_id: int, write_metrics: bool, output_dir: str,
                  wandb_project: str, wandb_group: str, wandb_run_name: str,
                  wandb_sweep_id: str, wandb_run_id: str,
-                 enable_op_level_metrics: bool, enable_cpu_op_level_metrics: bool,
-                 enable_chrome_trace: bool, enable_request_outputs: bool,
-                 keep_individual_batch_metrics: bool, model_num_layers: int) -> None:
+                 enable_op_level_metrics: bool,
+                 enable_cpu_op_level_metrics: bool, enable_chrome_trace: bool,
+                 enable_request_outputs: bool,
+                 keep_individual_batch_metrics: bool,
+                 model_num_layers: int) -> None:
         self.replica_id = replica_id
         self.write_metrics = write_metrics
         self.output_dir = output_dir
@@ -401,18 +404,19 @@ class MetricsConfig:
         self.model_num_layers = model_num_layers
 
     def __str__(self) -> str:
-        return (f"MetricsConfig(replica_id={self.replica_id}, "
-                f"write_metrics={self.write_metrics}, "
-                f"output_dir={self.output_dir}, "
-                f"wandb_project={self.wandb_project}, "
-                f"wandb_group={self.wandb_group}, "
-                f"wandb_run_name={self.wandb_run_name}, "
-                f"enable_op_level_metrics={self.enable_op_level_metrics}, "
-                f"enable_cpu_op_level_metrics={self.enable_cpu_op_level_metrics}, "
-                f"enable_chrome_trace={self.enable_chrome_trace}, "
-                f"enable_request_outputs={self.enable_request_outputs}, "
-                f"keep_individual_batch_metrics="
-                f"{self.keep_individual_batch_metrics})")
+        return (
+            f"MetricsConfig(replica_id={self.replica_id}, "
+            f"write_metrics={self.write_metrics}, "
+            f"output_dir={self.output_dir}, "
+            f"wandb_project={self.wandb_project}, "
+            f"wandb_group={self.wandb_group}, "
+            f"wandb_run_name={self.wandb_run_name}, "
+            f"enable_op_level_metrics={self.enable_op_level_metrics}, "
+            f"enable_cpu_op_level_metrics={self.enable_cpu_op_level_metrics}, "
+            f"enable_chrome_trace={self.enable_chrome_trace}, "
+            f"enable_request_outputs={self.enable_request_outputs}, "
+            f"keep_individual_batch_metrics="
+            f"{self.keep_individual_batch_metrics})")
 
 
 _STR_DTYPE_TO_TORCH_DTYPE = {

@@ -82,14 +82,16 @@ class LlamaMLP(nn.Module):
             input_is_parallel=True,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.
+            MLP_DOWN_PROJ_ALL_REDUCE,
             layer_id=layer_id)
         if hidden_act != "silu":
             raise ValueError(f"Unsupported activation: {hidden_act}. "
                              "Only silu is supported for now.")
         self.act_fn = SiluAndMul()
 
-        self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION, layer_id=layer_id)
+        self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION,
+                                               layer_id=layer_id)
 
     def forward(self, x):
         gate_up, _ = self.gate_up_proj(x)
@@ -101,16 +103,14 @@ class LlamaMLP(nn.Module):
 
 class LlamaAttention(nn.Module):
 
-    def __init__(
-        self,
-        hidden_size: int,
-        num_heads: int,
-        num_kv_heads: int,
-        rope_theta: float = 10000,
-        rope_scaling: Optional[Dict[str, Any]] = None,
-        max_position_embeddings: int = 8192,
-        layer_id: Optional[int] = None
-    ) -> None:
+    def __init__(self,
+                 hidden_size: int,
+                 num_heads: int,
+                 num_kv_heads: int,
+                 rope_theta: float = 10000,
+                 rope_scaling: Optional[Dict[str, Any]] = None,
+                 max_position_embeddings: int = 8192,
+                 layer_id: Optional[int] = None) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         tp_size = get_tensor_model_parallel_world_size()
@@ -212,14 +212,16 @@ class LlamaDecoderLayer(nn.Module):
             hidden_act=config.hidden_act,
             layer_id=layer_id,
         )
-        self.input_layernorm = RMSNorm(config.hidden_size,
-                                       eps=config.rms_norm_eps,
-                                       norm_name=OperationMetrics.INPUT_LAYERNORM,
-                                       layer_id=layer_id)
-        self.post_attention_layernorm = RMSNorm(config.hidden_size,
-                                                eps=config.rms_norm_eps,
-                                                norm_name=OperationMetrics.POST_ATTENTION_LAYERNORM,
-                                                layer_id=layer_id)
+        self.input_layernorm = RMSNorm(
+            config.hidden_size,
+            eps=config.rms_norm_eps,
+            norm_name=OperationMetrics.INPUT_LAYERNORM,
+            layer_id=layer_id)
+        self.post_attention_layernorm = RMSNorm(
+            config.hidden_size,
+            eps=config.rms_norm_eps,
+            norm_name=OperationMetrics.POST_ATTENTION_LAYERNORM,
+            layer_id=layer_id)
 
     def forward(
         self,
@@ -267,7 +269,8 @@ class LlamaModel(nn.Module):
                 communication_metric_name=OperationMetrics.EMBED_ALL_REDUCE,
             )
 
-        num_layers = config.num_hidden_layers // get_pipeline_model_parallel_world_size()
+        num_layers = config.num_hidden_layers // get_pipeline_model_parallel_world_size(
+        )
         layer_offset = get_pipeline_model_parallel_rank() * num_layers
         self.layers = nn.ModuleList([
             LlamaDecoderLayer(config, layer_id=layer_id + layer_offset)

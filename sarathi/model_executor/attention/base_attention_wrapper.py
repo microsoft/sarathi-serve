@@ -31,11 +31,15 @@ class BaseAttentionWrapper(ABC):
     However, we cannot have a single timer for all layers because the same timer cannot be turned on/off dynamically.
     So, we have timers for each layer separately.
     """
-    def get_timer(self, operation: OperationMetrics, layer_id: Optional[int] = None):
+
+    def get_timer(self,
+                  operation: OperationMetrics,
+                  layer_id: Optional[int] = None):
         if self._timers.get((operation, layer_id)) is None:
-            self._timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
+            self._timers[(operation,
+                          layer_id)] = CudaTimer(operation, layer_id)
         return self._timers.get((operation, layer_id))
-    
+
     @abstractmethod
     def begin_forward(
         self,

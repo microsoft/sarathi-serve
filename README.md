@@ -30,7 +30,13 @@ Create a Python 3.10 environment,
  mamba create -p ./env python=3.10  
 ```
 
-### Install Pytorch
+### Install Dev Dependencies
+
+```sh
+pip install -r requirements-dev.txt
+```
+
+### Install PyTorch
 
 ```sh
 pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cu121

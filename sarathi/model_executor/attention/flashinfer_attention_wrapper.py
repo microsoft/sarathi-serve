@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn.functional as F
 from flashinfer import (
@@ -195,7 +194,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             )
 
         with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):
-            output = output.reshape(-1,
-                                    self.num_q_heads * self.head_dim)
+            output = output.reshape(-1, self.num_q_heads * self.head_dim)
 
         return output

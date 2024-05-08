@@ -122,32 +122,27 @@ class EngineArgs:
         self,
     ) -> Tuple[ModelConfig, CacheConfig, ParallelConfig, BaseSchedulerConfig,
                MetricsConfig]:
-        model_config = ModelConfig(
-            model=self.model,
-            tokenizer=self.tokenizer,
-            tokenizer_mode=self.tokenizer_mode,
-            trust_remote_code=self.trust_remote_code,
-            download_dir=self.download_dir,
-            load_format=self.load_format,
-            dtype=self.dtype,
-            seed=self.seed,
-            revision=self.revision,
-            max_model_len=self.max_model_len,
-            attention_backend=self.attention_backend
-        )
+        model_config = ModelConfig(model=self.model,
+                                   tokenizer=self.tokenizer,
+                                   tokenizer_mode=self.tokenizer_mode,
+                                   trust_remote_code=self.trust_remote_code,
+                                   download_dir=self.download_dir,
+                                   load_format=self.load_format,
+                                   dtype=self.dtype,
+                                   seed=self.seed,
+                                   revision=self.revision,
+                                   max_model_len=self.max_model_len,
+                                   attention_backend=self.attention_backend)
         cache_config = CacheConfig(
             block_size=self.block_size,
-            gpu_memory_utilization=self.gpu_memory_utilization
-        )
+            gpu_memory_utilization=self.gpu_memory_utilization)
         parallel_config = ParallelConfig(
             pipeline_parallel_size=self.pipeline_parallel_size,
             tensor_parallel_size=self.tensor_parallel_size,
-            replica_resource_mapping=self.replica_resource_mapping
-        )
+            replica_resource_mapping=self.replica_resource_mapping)
         scheduler_config = self._get_scheduler_config(
             model_config=model_config,
-            num_pipeline_stages=self.pipeline_parallel_size
-        )
+            num_pipeline_stages=self.pipeline_parallel_size)
         metrics_config = MetricsConfig(
             replica_id=self.replica_id,
             write_metrics=self.write_metrics,

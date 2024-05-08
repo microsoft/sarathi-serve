@@ -111,8 +111,8 @@ class BaseWorker:
         self.model_runner = ModelRunner(self.model_config,
                                         self.parallel_config,
                                         self.scheduler_config,
-                                        self.cache_config,
-                                        self.device, self.rank)
+                                        self.cache_config, self.device,
+                                        self.rank)
         logger.info(f"Model initialized on worker {self.rank}.")
 
     @torch.inference_mode()

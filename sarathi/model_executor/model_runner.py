@@ -212,7 +212,8 @@ class ModelRunner:
     ) -> torch.Tensor:
         # Prepare input tensors.
         with self._prepare_inputs_e2e_timer:
-            input_tokens, input_positions = self._prepare_inputs(seq_metadata_list)
+            input_tokens, input_positions = self._prepare_inputs(
+                seq_metadata_list)
 
         get_attention_wrapper().begin_forward(seq_metadata_list)
 

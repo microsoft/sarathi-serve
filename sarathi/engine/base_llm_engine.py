@@ -110,7 +110,7 @@ class BaseLLMEngine:
         # Create the scheduler.
         self.scheduler = SchedulerRegistry.get(scheduler_config.type,
                                                scheduler_config, cache_config)
-        
+
         self._scheduler_timer = CpuTimer(CpuOperationMetrics.SCHEDULE)
         self._process_model_outputs_timer = CpuTimer(
             CpuOperationMetrics.PROCESS_MODEL_OUTPUTS)
@@ -264,9 +264,9 @@ class BaseLLMEngine:
                 sampler_outputs,
             )
             self.scheduler.on_step_completed()
-        
+
         end_time = time.perf_counter()
-        
+
         self.metrics_store.on_batch_end(
             seq_metadata_list=seq_metadata_list,
             scheduler_outputs=scheduler_outputs,

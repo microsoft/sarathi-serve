@@ -52,6 +52,7 @@ def check_enabled(func):
 
     return wrapper
 
+
 PROFILE_LAYER_ID = 10
 BATCH_ID_STR = "Batch Id"
 REQUEST_ID_STR = "Request Id"
@@ -139,7 +140,7 @@ class MetricsStore(metaclass=Singleton):
             )
 
         self.token_metrics_time_list: Dict[TokenMetricsTimeList,
-                                            DataSeries] = {}
+                                           DataSeries] = {}
         for metric_name in TokenMetricsTimeList:
             self.token_metrics_time_list[metric_name] = DataSeries(
                 DECODE_TOKEN_ID_STR,
@@ -147,7 +148,7 @@ class MetricsStore(metaclass=Singleton):
             )
 
         self.seq_metrics_histogram: Dict[SequenceMetricsHistogram,
-                                          DataSeries] = {}
+                                         DataSeries] = {}
         for metric_name in SequenceMetricsHistogram:
             self.seq_metrics_histogram[metric_name] = DataSeries(
                 REQUEST_ID_STR,
@@ -182,7 +183,7 @@ class MetricsStore(metaclass=Singleton):
 
         # Initialise completion metrics
         self.completion_metrics_time_series: Dict[CompletionMetricsTimeSeries,
-                                                   DataSeries] = {}
+                                                  DataSeries] = {}
         for metric_name in CompletionMetricsTimeSeries:
             self.completion_metrics_time_series[metric_name] = DataSeries(
                 TIME_STR,
@@ -191,7 +192,7 @@ class MetricsStore(metaclass=Singleton):
 
         self.operation_metrics: Dict[OperationMetrics, CDFSketch] = {}
         self.operation_metrics_per_batch: Dict[OperationMetrics,
-                                                DataSeries] = {}
+                                               DataSeries] = {}
         self.operation_metrics_per_batch_events: Dict[
             OperationMetrics, List[Tuple[torch.cuda.Event]]] = {}
         for metric_name in OperationMetrics:
@@ -204,14 +205,13 @@ class MetricsStore(metaclass=Singleton):
             self.operation_metrics_per_batch_events[metric_name] = []
 
         self.cpu_operation_metrics: Dict[CpuOperationMetrics,
-                                          Union[CDFSketch, DataSeries]] = {}
+                                         Union[CDFSketch, DataSeries]] = {}
         for metric_name in CpuOperationMetrics:
             self.cpu_operation_metrics[metric_name] = DataSeries(
                 BATCH_ID_STR,
                 metric_name.value,
             ) if self._keep_individual_batch_metrics else CDFSketch(
-                metric_name.value,
-            )
+                metric_name.value, )
 
         self.chrome_trace: List[Dict[str, Any]] = []
         self.requests_outputs: List[RequestOutput] = []
@@ -227,8 +227,7 @@ class MetricsStore(metaclass=Singleton):
         )
         if self._wandb_sweep_id or self._wandb_run_id:
             logger.warn(
-                "wandb_sweep_id and wandb_run_id are not supported yet."
-            )
+                "wandb_sweep_id and wandb_run_id are not supported yet.")
 
         wandb.init(
             project=self._wandb_project,
@@ -427,18 +426,14 @@ class MetricsStore(metaclass=Singleton):
 
         if trace:
             self.chrome_trace.append(trace)
-    
+
     @check_enabled
     @if_write_metrics
-    def on_batch_stage_end(
-        self,
-        seq_metadata_list: List[SequenceMetadata],
-        scheduler_outputs: SchedulerOutputs,
-        tensor_parallel_rank: int,
-        pipeline_parallel_rank: int,
-        start_time: float,
-        end_time: float
-    ) -> None:
+    def on_batch_stage_end(self, seq_metadata_list: List[SequenceMetadata],
+                           scheduler_outputs: SchedulerOutputs,
+                           tensor_parallel_rank: int,
+                           pipeline_parallel_rank: int, start_time: float,
+                           end_time: float) -> None:
         self._process_individual_batch_metrics()
         self._next_batch_id = scheduler_outputs.id + 1
         if not self._enable_chrome_trace or len(seq_metadata_list) == 0:
@@ -469,7 +464,8 @@ class MetricsStore(metaclass=Singleton):
         execution_time = batch_end_time - batch_start_time
 
         for seq_metadata in seq_metadata_list:
-            self._update_per_token_execution_times(batch_end_time, seq_metadata.seq)
+            self._update_per_token_execution_times(batch_end_time,
+                                                   seq_metadata.seq)
             if seq_metadata.seq.is_finished():
                 self._on_request_end(seq_metadata.seq)
 
@@ -545,8 +541,7 @@ class MetricsStore(metaclass=Singleton):
         }
 
     def clear_individual_batch_metrics(self):
-        for metrics_name, _ in self.operation_metrics_per_batch_events.items(
-        ):
+        for metrics_name, _ in self.operation_metrics_per_batch_events.items():
             self.operation_metrics_per_batch_events[metrics_name] = []
 
     def _process_individual_batch_metrics(self):
@@ -571,7 +566,7 @@ class MetricsStore(metaclass=Singleton):
         if self._keep_individual_batch_metrics:
             self.operation_metrics_per_batch_events[metrics_name].append(
                 [start_event, end_event])
-    
+
     @check_enabled
     @if_write_metrics
     def push_operation_metrics(
@@ -650,10 +645,9 @@ class MetricsStore(metaclass=Singleton):
 
         self.requests_outputs.sort(key=lambda x: int(x.request_id))
         with open(f"{self._output_dir}/responses.json", "w") as f:
-            json.dump(
-                [asdict(response) for response in self.requests_outputs],
-                f,
-                indent='\t')
+            json.dump([asdict(response) for response in self.requests_outputs],
+                      f,
+                      indent='\t')
 
     def _store_operation_metrics(self, base_plot_path: str):
         if not self._enable_op_level_metrics and not self._enable_cpu_op_level_metrics:
@@ -666,7 +660,9 @@ class MetricsStore(metaclass=Singleton):
                                 f"{dataseries.metric_name}_execution_time",
                                 TIME_STR_MS)
             # In `is_op_enabled` we take operations from one of the layers and only rank 0 is considered.
-            total_operation_runtimes[dataseries.metric_name] = dataseries.sum * self._model_num_layers
+            total_operation_runtimes[
+                dataseries.
+                metric_name] = dataseries.sum * self._model_num_layers
 
         for dataseries in self.cpu_operation_metrics.values():
             dataseries.plot_cdf(base_plot_path,

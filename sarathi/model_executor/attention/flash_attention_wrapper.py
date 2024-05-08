@@ -187,7 +187,8 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
                     causal=True,
                 )
 
-            with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):
+            with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE,
+                                layer_id):
                 output[token_offset:token_offset + query_len].copy_(
                     seq_output.reshape(-1, self.num_q_heads * self.head_dim))
 
