@@ -1,0 +1,27 @@
+schedulers:
+  - name: vllm
+    scheduler: vllm
+    batch_size: 128
+  - name: sarathi_256
+    scheduler: sarathi
+    chunk_size: 256
+    batch_size: 128
+
+traces:
+  - name: chat
+    trace_file: "./data/processed_traces/sharegpt_8k_filtered_stats_llama2_tokenizer.csv"
+    max_seq_len: 8192
+    num_requests: 10
+    start_qps: 2
+
+parallel_spec:
+  - name: tp_2
+    tp_dimension: 2
+    pp_dimension: 1
+
+models:
+  - name: codellama-34b-instruct-hf
+    identifier: codellama/CodeLlama-34b-Instruct-hf
+    parallel_specs: ["tp_2"]
+    scheduler_specs: ["vllm", "sarathi_256"]
+    traces: ["chat"]

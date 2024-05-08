@@ -5,14 +5,17 @@ pandas  # Required for Ray data.
 pyarrow  # Required for Ray data.
 sentencepiece  # Required for LLaMA tokenizer.
 numpy
-torch == 2.0.1
-transformers >= 4.33.1  # Required for Code Llama.
-xformers >= 0.0.22 # Required for multi-query / grouped-query attention
-fastapi
-uvicorn
-pydantic < 2  # Required for OpenAI server.
+torch == 2.2.2
+transformers >= 4.37.0  # Required for Mistral.
 matplotlib
 plotly_express
+seaborn
 wandb
 kaleido
 ddsketch
+jupyterlab
+flashinfer
+pillow
+tiktoken
+grpcio
+nvidia-nccl-cu12 == 2.21.5

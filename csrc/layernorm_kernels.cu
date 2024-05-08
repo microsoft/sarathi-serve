@@ -4,7 +4,7 @@
 #include "dispatch_utils.h"
 #include "reduction_utils.cuh"
 
-namespace vllm {
+namespace sarathi {
 
 // TODO(woosuk): Further optimize this kernel.
 template<typename scalar_t>
@@ -34,7 +34,7 @@ __global__ void rms_norm_kernel(
   }
 }
 
-} // namespace vllm
+} // namespace sarathi
 
 void rms_norm(
   torch::Tensor& out,      // [num_tokens, hidden_size]
@@ -47,11 +47,11 @@ void rms_norm(
   dim3 grid(num_tokens);
   dim3 block(std::min(hidden_size, 1024));
   const cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  VLLM_DISPATCH_FLOATING_TYPES(
+  SARATHI_DISPATCH_FLOATING_TYPES(
     input.scalar_type(),
     "rms_norm_kernel",
     [&] {
-      vllm::rms_norm_kernel<scalar_t><<<grid, block, 0, stream>>>(
+      sarathi::rms_norm_kernel<scalar_t><<<grid, block, 0, stream>>>(
         out.data_ptr<scalar_t>(),
         input.data_ptr<scalar_t>(),
         weight.data_ptr<scalar_t>(),
