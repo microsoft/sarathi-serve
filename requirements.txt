@@ -18,4 +18,4 @@ flashinfer
 pillow
 tiktoken
 grpcio
-nvidia-nccl-cu12 == 2.21.5
+tqdm
