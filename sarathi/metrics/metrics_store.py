@@ -647,7 +647,7 @@ class MetricsStore(metaclass=Singleton):
         with open(f"{self._output_dir}/responses.json", "w") as f:
             json.dump([asdict(response) for response in self.requests_outputs],
                       f,
-                      indent='\t')
+                      indent="\t")
 
     def _store_operation_metrics(self, base_plot_path: str):
         if not self._enable_op_level_metrics and not self._enable_cpu_op_level_metrics:
@@ -749,7 +749,7 @@ class MetricsStore(metaclass=Singleton):
                 dataseries.plot_step(base_plot_path,
                                      f"{dataseries.metric_name}_per_batch",
                                      y_axis_label=TIME_STR,
-                                     y_cumsum=False),
+                                     y_cumsum=False)
 
         for dataseries in self.batch_metrics_count_distribution.values():
             dataseries.plot_cdf(base_plot_path, dataseries.metric_name,
@@ -758,7 +758,7 @@ class MetricsStore(metaclass=Singleton):
                 dataseries.plot_step(base_plot_path,
                                      f"{dataseries.metric_name}_per_batch",
                                      y_axis_label=COUNT_STR,
-                                     y_cumsum=False),
+                                     y_cumsum=False)
 
     def _store_completion_metrics(self, base_plot_path: str):
         for dataseries in self.token_metrics_time_distribution.values():
@@ -793,7 +793,7 @@ class MetricsStore(metaclass=Singleton):
                                  "w",
                                  compression=zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr(
-                    'chrome_trace.json',
+                    "chrome_trace.json",
                     json.dumps(self.chrome_trace),
                 )
             wandb.save(zip_file_path, policy="now")

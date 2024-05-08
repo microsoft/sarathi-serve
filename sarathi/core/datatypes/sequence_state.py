@@ -204,7 +204,10 @@ class SequenceState:
                                                status: SequenceStatus) -> None:
         self._preempted_time += current_time - self._last_pause_at
 
-        if status == SequenceStatus.FINISHED_STOPPED or status == SequenceStatus.FINISHED_LENGTH_CAPPED:
+        if status in [
+                SequenceStatus.FINISHED_STOPPED,
+                status == SequenceStatus.FINISHED_LENGTH_CAPPED
+        ]:
             self._is_completed = True
             self._completed_at = current_time
         elif status == SequenceStatus.RUNNING:

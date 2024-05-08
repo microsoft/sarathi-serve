@@ -65,7 +65,7 @@ class EngineArgs:
             self.tokenizer = self.model
         if self.write_metrics:
             os.makedirs(self.output_dir, exist_ok=True)
-            with open(f"{self.output_dir}/config.yml", 'w') as f:
+            with open(f'{self.output_dir}/config.yml', 'w') as f:
                 yaml.dump(asdict(self),
                           f,
                           default_flow_style=False,
