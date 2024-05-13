@@ -15,7 +15,6 @@ from sarathi.model_executor.parallel_utils.parallel_state import (
     get_tensor_model_parallel_rank,
     get_tensor_model_parallel_world_size,
 )
-from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
 from .mappings import (
     gather_from_tensor_model_parallel_region,
@@ -340,9 +339,9 @@ class RowParallelLinear(torch.nn.Module):
 
         self.create_weights(params_dtype)
 
-        if not reduce_results and (bias and not skip_bias_add):
-            raise ValueError("When not reduce the results, adding bias to the "
-                             "results can lead to incorrect results")
+        # if not reduce_results and (bias and not skip_bias_add):
+        #     raise ValueError("When not reduce the results, adding bias to the "
+        #                      "results can lead to incorrect results")
 
         if bias:
             self.bias = Parameter(torch.empty(
