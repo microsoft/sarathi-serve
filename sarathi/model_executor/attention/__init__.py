@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum
 from typing import Union
 
 from sarathi.model_executor.attention.flashinfer_attention_wrapper import FlashinferAttentionWrapper
@@ -7,9 +7,9 @@ from sarathi.model_executor.attention.no_op_attention_wrapper import NoOpAttenti
 
 
 class AttentionBackend(Enum):
-    FLASHINFER = auto()
-    FLASH_ATTENTION = auto()
-    NO_OP = auto()
+    FLASHINFER = "FLASHINFER"
+    FLASH_ATTENTION = "FLASH_ATTENTION"
+    NO_OP = "NO_OP"
 
 
 ATTENTION_BACKEND = AttentionBackend.NO_OP

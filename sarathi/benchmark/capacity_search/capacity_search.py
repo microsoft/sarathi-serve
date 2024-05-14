@@ -9,6 +9,7 @@ import pandas as pd
 import ray
 import wandb
 
+from sarathi.logger import init_logger
 from sarathi.benchmark.capacity_search.config import (
     JobConfig,
     BenchmarkConfig,
@@ -19,6 +20,8 @@ from sarathi.benchmark.capacity_search.ray_utils import (
 )
 from sarathi.benchmark.types import ReplicaResourceMapping
 
+logger = init_logger(__name__)
+
 
 def release_resources_on_failure(func):
 
@@ -26,7 +29,7 @@ def release_resources_on_failure(func):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
-            print(f"Error in search: {e}", flush=True)
+            logger.error(f"Error in search: {e}", flush=True)
             self.release_resources()
 
     return wrapper
@@ -61,8 +64,7 @@ class CapacitySearch:
     ):
         resource_mapping_arg = f"--replica_resource_mapping '{json.dumps(self.resource_mapping)}'"
         command = f"python -m sarathi.benchmark.main {benchmark_config.to_args()} {resource_mapping_arg}"
-        if self.args.debug:
-            print(f"Running command: {command}", flush=True)
+        logger.debug(f"Running command: {command}", flush=True)
 
         return command
 
@@ -92,7 +94,7 @@ class CapacitySearch:
             scheduling_delay <= self.args.scheduling_delay_slo_value
             and tbt <= self.args.tbt_slo_value)
 
-        print(
+        logger.info(
             f"{benchmark_config.to_human_readable_name()} - "
             f"Scheduling delay (P{self.args.scheduling_delay_slo_quantile}): {scheduling_delay}"
             f" - TBT (P{self.args.tbt_slo_quantile}): {tbt}",
@@ -149,7 +151,7 @@ class CapacitySearch:
         """
         Perform binary search to find the maximum QPS under the SLO
         """
-        print(
+        logger.info(
             f"Starting search for {self.job_config.get_human_readable_name()}",
             flush=True,
         )
@@ -166,7 +168,7 @@ class CapacitySearch:
         found_valid_qps = False
 
         for _ in range(self.args.max_iterations):
-            print(f"Searching between {left} and {right}", flush=True)
+            logger.info(f"Searching between {left} and {right}", flush=True)
             # stopping condition - we have reached the minimum granularity
             if abs(left -
                    right) < self.args.min_search_granularity * qps / 100:
@@ -209,13 +211,13 @@ class CapacitySearch:
                 min_qps_over_sla = min(min_qps_over_sla, qps)
 
         if not found_valid_qps:
-            print(
+            logger.info(
                 f"No valid QPS found for {self.job_config.get_human_readable_name()}",
                 flush=True,
             )
             return {}
 
-        print(
+        logger.info(
             f"Max QPS under SLO for {self.job_config.get_human_readable_name()}: "
             f"{max_qps_under_sla}, Scheduling delay: {scheduling_delay_at_max_qps}, TBT: {tbt_at_max_qps}",
             flush=True,

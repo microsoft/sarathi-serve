@@ -4,7 +4,10 @@ import os
 
 import yaml
 
+from sarathi.logger import init_logger
 from sarathi.benchmark.constants import DEFAULT_CONFIG_FILE
+
+logger = init_logger(__name__)
 
 
 def custom_bool(val):
@@ -35,6 +38,8 @@ class ConfigParser:
         self._args = None
         self._load_yaml(config_file)
         self._parse_args()
+        logger.info(f"Starting benchmark with config: {self._args}")
+
         self._add_derived_args()
         self._write_yaml_to_file()
 
@@ -47,7 +52,6 @@ class ConfigParser:
         self._args = self._parser.parse_args()
 
     def _add_derived_args(self):
-        print(self._args)
         self._args.output_dir = f"{self._args.output_dir}/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')}"
         os.makedirs(self._args.output_dir, exist_ok=True)
 

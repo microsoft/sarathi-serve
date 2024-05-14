@@ -512,12 +512,12 @@ def _get_and_verify_max_len(
         derived_max_model_len *= scaling_factor
 
     if max_model_len is None:
-        print(
+        logger.info(
             f"Using the derived maximum model length: {derived_max_model_len}")
         max_model_len = derived_max_model_len
     elif max_model_len > derived_max_model_len:
-        print(f"Applying rope_scaling to the maximum model length: "
-              f"{derived_max_model_len} -> {max_model_len}")
+        logger.info(f"Applying rope_scaling to the maximum model length: "
+                    f"{derived_max_model_len} -> {max_model_len}")
         # force rope_scaling
         scaling_factor = max_model_len / derived_max_model_len
         rope_scaling = {"type": "linear", "factor": scaling_factor}

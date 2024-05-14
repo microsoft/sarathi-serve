@@ -11,11 +11,11 @@ import torch.nn.functional as F
 import torch.nn.init as init
 from torch.nn.parameter import Parameter
 
+from sarathi.logger import init_logger
 from sarathi.model_executor.parallel_utils.parallel_state import (
     get_tensor_model_parallel_rank,
     get_tensor_model_parallel_world_size,
 )
-from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
 from .mappings import (
     gather_from_tensor_model_parallel_region,
@@ -27,6 +27,9 @@ from .utils import (
     divide,
     VocabUtility,
 )
+
+logger = init_logger(__name__)
+
 
 _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {'tensor_model_parallel': False,
                                       'partition_dim': -1,
@@ -341,8 +344,8 @@ class RowParallelLinear(torch.nn.Module):
         self.create_weights(params_dtype)
 
         if not reduce_results and (bias and not skip_bias_add):
-            raise ValueError("When not reduce the results, adding bias to the "
-                             "results can lead to incorrect results")
+            logger.warning("When not reduce the results, adding bias to the "
+                           "results can lead to incorrect results")
 
         if bias:
             self.bias = Parameter(torch.empty(

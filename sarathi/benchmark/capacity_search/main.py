@@ -15,7 +15,10 @@ import wandb
 
 import yaml
 
+from sarathi.logger import init_logger
 from sarathi.benchmark.capacity_search.search_manager import SearchManager
+
+logger = init_logger(__name__)
 
 
 def get_args():
@@ -67,11 +70,11 @@ if __name__ == "__main__":
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    print("Starting capacity search", flush=True)
+    logger.info("Starting capacity search", flush=True)
 
     # merge the config with the args
     config.update(vars(args))
-    print(f"Config: {config}", flush=True)
+    logger.info(f"Config: {config}", flush=True)
 
     # store the config and args
     json.dump(config, open(f"{args.output_dir}/config.json", "w"))
@@ -93,4 +96,4 @@ if __name__ == "__main__":
 
     end_time = time.time()
 
-    print(f"Benchmarking took time: {end_time - start_time}", flush=True)
+    logger.info(f"Benchmarking took time: {end_time - start_time}", flush=True)

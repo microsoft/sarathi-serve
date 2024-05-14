@@ -126,8 +126,9 @@ class BaseLLMEngine:
 
     def _init_workers_ray(self, **ray_remote_kwargs):
         replica_resource_mapping = self.parallel_config.replica_resource_mapping
-        print("Starting workers with resource mapping:")
-        print(replica_resource_mapping)
+        logger.info(
+            f"Starting workers with resource mapping: {replica_resource_mapping}"
+        )
 
         self.workers: List[RayWorker] = []
 
@@ -167,7 +168,7 @@ class BaseLLMEngine:
         # In case port is already in use, this will fail.
         distributed_init_method = f"tcp://{driver_ip}:{get_random_port()}"
 
-        print(
+        logger.info(
             f"Initializing workers with distributed init method: {distributed_init_method}"
         )
 

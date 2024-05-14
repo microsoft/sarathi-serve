@@ -232,8 +232,8 @@ class BenchmarkRunnerLauncher:
         if self._config.replica_resource_mapping:
             replica_resource_mapping = json.loads(
                 self._config.replica_resource_mapping)
-            print("Replica resource mapping:")
-            print(replica_resource_mapping)
+            logger.info(
+                f"Replica resource mapping: {replica_resource_mapping}")
             return replica_resource_mapping
 
         cluster_resources_keys = list(ray.available_resources().keys())
@@ -273,8 +273,7 @@ class BenchmarkRunnerLauncher:
                 replica_resource_mapping[str(replica_id)].append(
                     available_gpus.pop(0))
 
-        print("Replica resource mapping:")
-        print(replica_resource_mapping)
+        logger.info(f"Replica resource mapping: {replica_resource_mapping}")
 
         return replica_resource_mapping
 
