@@ -2,6 +2,7 @@ import argparse
 
 import ray
 
+from sarathi.logger import init_logger
 from sarathi.benchmark.capacity_search.capacity_search import CapacitySearch
 from sarathi.benchmark.capacity_search.config import JobConfig
 from sarathi.benchmark.capacity_search.ray_utils import (
@@ -9,6 +10,8 @@ from sarathi.benchmark.capacity_search.ray_utils import (
     RayParallelRunner,
 )
 from sarathi.benchmark.types import ReplicaResourceMapping
+
+logger = init_logger(__name__)
 
 
 def run_search(
@@ -42,7 +45,7 @@ class SearchManager:
         job_configs = JobConfig.generate_job_configs(self.config)
 
         for job_config in job_configs:
-            print(f"Running search for {job_config}")
+            logger.info(f"Running search for {job_config}")
 
         ray_parallel_runner = RayParallelRunner()
 
