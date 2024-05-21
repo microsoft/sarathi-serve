@@ -1,4 +1,0 @@
-[submodule "third_party/flash-attention"]
-	path = third_party/flash-attention
-	url = https://github.com/skrider/flash-attention.git
-	commit = 7968148214850ede9fa4bd515316c643ebd8ae83

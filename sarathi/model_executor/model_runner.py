@@ -3,6 +3,7 @@ from typing import List, Tuple, Optional
 import torch
 import torch.distributed
 
+from sarathi.logger import init_logger
 from sarathi.config import (CacheConfig, ModelConfig, ParallelConfig,
                             BaseSchedulerConfig, SchedulerType)
 from sarathi.model_executor import get_model, set_random_seed
@@ -16,6 +17,8 @@ from sarathi.metrics.cpu_timer import CpuTimer
 from sarathi.metrics.cuda_timer import CudaTimer
 from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.utils import pad_to_alignment
+
+logger = init_logger(__name__)
 
 
 class ModelRunner:
@@ -219,11 +222,15 @@ class ModelRunner:
 
         with self._model_execution_e2e_timer:
             # Execute the model.
-            output = self.model(
-                hidden_states=input_tokens,
-                positions=input_positions,
-                kv_caches=gpu_cache,
-            )
+            try:
+                output = self.model(
+                    hidden_states=input_tokens,
+                    positions=input_positions,
+                    kv_caches=gpu_cache,
+                )
+            except RuntimeError as e:
+                logger.error(f"RuntimeError: {e} for seq_metadata_list: {seq_metadata_list}")
+                raise e
 
         with self._sampler_e2e_timer:
             if self.sampler is not None:

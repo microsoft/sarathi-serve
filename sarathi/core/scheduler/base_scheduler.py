@@ -116,7 +116,7 @@ class BaseScheduler(ABC):
         seq: Sequence,
     ) -> None:
         assert seq.is_executing()
-        self.free_seq(seq)
+        self._free_seq(seq)
         self.waiting.insert(0, seq)
 
     def _check_request_prompt_length(self, seq: Sequence) -> bool:

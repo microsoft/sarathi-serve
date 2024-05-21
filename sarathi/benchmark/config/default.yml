@@ -56,7 +56,7 @@ trace_request_interval_generator:
   time_scale_factor: 0.3
 
 poisson_request_interval_generator:
-  qps: 1
+  qps: 1.0
 
 gamma_request_interval_generator:
   cv: 0.5
