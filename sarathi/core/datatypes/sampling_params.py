@@ -67,9 +67,6 @@ class SamplingParams:
                 f"max_tokens must be at least 1, got {self.max_tokens}.")
 
     def _verify_greedy_sampling(self) -> None:
-        if self.best_of > 1:
-            raise ValueError("best_of must be 1 when using greedy sampling."
-                             f"Got {self.best_of}.")
         if self.top_p < 1.0 - _SAMPLING_EPS:
             raise ValueError("top_p must be 1 when using greedy sampling.")
         if self.top_k != -1:

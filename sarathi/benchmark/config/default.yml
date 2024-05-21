@@ -5,7 +5,7 @@ write_json_trace: true
 write_chrome_trace: true
 write_metrics: true
 enable_profiling: false
-gpu_memory_utilization: 0.9
+gpu_memory_utilization: 0.85
 time_limit: 1800 # seconds
 replica_resource_mapping: ""
 
@@ -19,7 +19,7 @@ model:
   # name: codellama/CodeLlama-34b-Instruct-hf
   # name: Qwen/Qwen-72B
   # name: tiiuae/falcon-180B
-  tensor_parallel_degree: 4
+  tensor_parallel_degree: 8
   pipeline_parallel_degree: 1
   max_model_len: 4096
   load_format: dummy
@@ -30,7 +30,7 @@ request_generator:
 
 synthetic_request_generator:
   length_provider: trace
-  interval_provider: poisson
+  interval_provider: static
   num_requests: 64
 
 trace_request_generator:

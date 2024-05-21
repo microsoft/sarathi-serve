@@ -40,9 +40,8 @@ class ModelRunner:
 
         self.model = get_model(self.model_config)
         get_attention_wrapper().init(
-            self.model_config.get_num_q_heads(self.parallel_config),
-            self.model_config.get_num_kv_heads(self.parallel_config),
-            self.model_config.get_head_size(),
+            self.model_config,
+            self.parallel_config,
             cache_config.block_size,
             self.device,
         )

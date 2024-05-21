@@ -32,7 +32,6 @@ class SarathiScheduler(BaseScheduler):
         self.chunk_schedule_stages = self.scheduler_config.chunk_schedule_stages
 
         if self.enable_dynamic_chunking_schedule:
-            assert self.low_chunk_size < self.high_chunk_size
             assert self.chunk_schedule_stages > 0
             assert self.chunk_schedule_max_tokens > 0
             assert self.low_chunk_size % 32 == 0

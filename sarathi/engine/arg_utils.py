@@ -30,7 +30,7 @@ class EngineArgs:
     pipeline_parallel_size: int = 1
     tensor_parallel_size: int = 1
     block_size: int = 16
-    gpu_memory_utilization: float = 0.90
+    gpu_memory_utilization: float = 0.85
     revision: Optional[str] = None
     # scheduler parameters
     scheduler_type: str = 'sarathi'
