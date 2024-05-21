@@ -218,8 +218,8 @@ class CapacitySearch:
             return {}
 
         logger.info(
-            f"Max QPS under SLO for {self.job_config.get_human_readable_name()}: "
-            f"{max_qps_under_sla}, Scheduling delay: {scheduling_delay_at_max_qps}, TBT: {tbt_at_max_qps}",
+            f"Max QPS under SLO for {self.job_config.get_human_readable_name()} - "
+            f"QPS: {max_qps_under_sla}, Scheduling delay: {scheduling_delay_at_max_qps}, TBT: {tbt_at_max_qps}",
             flush=True,
         )
         best_run = wandb.Api().run(f"{self.args.wandb_project}/{best_run_id}")
