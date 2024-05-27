@@ -1,16 +1,14 @@
+from typing import List, Optional
+
 import torch
 import torch.nn.functional as F
-from flashinfer import (
-    append_paged_kv_cache,
-    BatchPrefillWithPagedKVCacheWrapper,
-)
-from typing import List, Optional
+from flashinfer import BatchPrefillWithPagedKVCacheWrapper, append_paged_kv_cache
 
 from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
-from sarathi.model_executor.utils import round_up_to_multiple
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
+from sarathi.model_executor.utils import round_up_to_multiple
 
 
 class FlashinferAttentionWrapper(BaseAttentionWrapper):
@@ -25,11 +23,10 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
     ):
         super().init(model_config, parallel_config, block_size, device)
 
-        workspace_buffer = torch.empty(16 * 1024 * 1024,
-                                       dtype=torch.uint8,
-                                       device=device)
-        self._wrapper = BatchPrefillWithPagedKVCacheWrapper(
-            workspace_buffer, "NHD")
+        workspace_buffer = torch.empty(
+            16 * 1024 * 1024, dtype=torch.uint8, device=device
+        )
+        self._wrapper = BatchPrefillWithPagedKVCacheWrapper(workspace_buffer, "NHD")
 
         self.is_metadata_initialized = False
         self.is_profiling_iteration = False
@@ -81,8 +78,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 continue
 
             prompt_chunk_len = seq_metadata.prompt_chunk_len
-            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed(
-            )
+            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed()
 
             current_total_len = processed_prompt_len + prompt_chunk_len
 
@@ -96,13 +92,14 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             # indptr for the prompt tokens in q/o tensor
             qo_indptr.append(qo_indptr[-1] + prompt_chunk_len)
             # Compute the kv page indices for the prompt tokens.
-            num_blocks_in_use = (current_total_len + self.block_size -
-                                 1) // self.block_size
-            kv_page_indices.extend(
-                seq_metadata.block_table[:num_blocks_in_use])
+            num_blocks_in_use = (
+                current_total_len + self.block_size - 1
+            ) // self.block_size
+            kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
             kv_page_indptr.append(kv_page_indptr[-1] + num_blocks_in_use)
-            kv_last_page_len.append(current_total_len % self.block_size
-                                    or self.block_size)
+            kv_last_page_len.append(
+                current_total_len % self.block_size or self.block_size
+            )
 
         for seq_metadata in seq_metadata_list:
             if seq_metadata.is_prompt:
@@ -117,24 +114,20 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             qo_indptr.append(qo_indptr[-1] + 1)
             # Compute the kv page indices for the prompt tokens.
             kv_page_indices.extend(seq_metadata.block_table)
-            kv_page_indptr.append(kv_page_indptr[-1] +
-                                  len(seq_metadata.block_table))
-            kv_last_page_len.append(context_len % self.block_size
-                                    or self.block_size)
+            kv_page_indptr.append(kv_page_indptr[-1] + len(seq_metadata.block_table))
+            kv_last_page_len.append(context_len % self.block_size or self.block_size)
 
         # Convert to tensors.
-        self.qo_indptr = torch.tensor(qo_indptr,
-                                      dtype=torch.int32,
-                                      device=self.device)
-        self.kv_page_indices = torch.tensor(kv_page_indices,
-                                            dtype=torch.int32,
-                                            device=self.device)
-        self.kv_page_indptr = torch.tensor(kv_page_indptr,
-                                           dtype=torch.int32,
-                                           device=self.device)
-        self.kv_last_page_len = torch.tensor(kv_last_page_len,
-                                             dtype=torch.int32,
-                                             device=self.device)
+        self.qo_indptr = torch.tensor(qo_indptr, dtype=torch.int32, device=self.device)
+        self.kv_page_indices = torch.tensor(
+            kv_page_indices, dtype=torch.int32, device=self.device
+        )
+        self.kv_page_indptr = torch.tensor(
+            kv_page_indptr, dtype=torch.int32, device=self.device
+        )
+        self.kv_last_page_len = torch.tensor(
+            kv_last_page_len, dtype=torch.int32, device=self.device
+        )
 
         self._wrapper.begin_forward(
             self.qo_indptr,
@@ -166,12 +159,9 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             return torch.zeros_like(query)
 
         with self.get_timer(OperationMetrics.ATTN_INPUT_RESHAPE, layer_id):
-            query = query.contiguous().reshape(-1, self.num_q_heads,
-                                               self.head_dim)
-            key = key.contiguous().reshape(-1, self.num_kv_heads,
-                                           self.head_dim)
-            value = value.contiguous().reshape(-1, self.num_kv_heads,
-                                               self.head_dim)
+            query = query.contiguous().reshape(-1, self.num_q_heads, self.head_dim)
+            key = key.contiguous().reshape(-1, self.num_kv_heads, self.head_dim)
+            value = value.contiguous().reshape(-1, self.num_kv_heads, self.head_dim)
 
         with self.get_timer(OperationMetrics.ATTN_KV_CACHE_SAVE, layer_id):
             append_paged_kv_cache(

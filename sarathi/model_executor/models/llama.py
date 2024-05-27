@@ -32,27 +32,29 @@ from transformers import LlamaConfig
 
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
+from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.activation import SiluAndMul
 from sarathi.model_executor.layers.layernorm import RMSNorm
-from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.model_executor.layers.rotary_embedding import get_rope
 from sarathi.model_executor.parallel_utils.parallel_state import (
-    get_tensor_model_parallel_rank,
-    get_tensor_model_parallel_world_size,
     get_pipeline_model_parallel_rank,
     get_pipeline_model_parallel_world_size,
+    get_tensor_model_parallel_rank,
+    get_tensor_model_parallel_world_size,
     is_pipeline_first_stage,
     is_pipeline_last_stage,
 )
-from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import (
-    send,
-    recv,
-)
+from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import recv, send
 from sarathi.model_executor.parallel_utils.tensor_parallel import (
-    VocabParallelEmbedding, ColumnParallelLinear, RowParallelLinear)
+    ColumnParallelLinear,
+    RowParallelLinear,
+    VocabParallelEmbedding,
+)
 from sarathi.model_executor.weight_utils import (
-    hf_model_weights_iterator, load_tensor_parallel_weights,
-    load_padded_tensor_parallel_vocab)
-from sarathi.model_executor.layers.rotary_embedding import get_rope
+    hf_model_weights_iterator,
+    load_padded_tensor_parallel_vocab,
+    load_tensor_parallel_weights,
+)
 from sarathi.worker.cache_engine import KVCache
 
 
@@ -74,7 +76,8 @@ class LlamaMLP(nn.Module):
             perform_initialization=False,
             linear_metric_name=OperationMetrics.MLP_UP_PROJ,
             communication_metric_name=OperationMetrics.MLP_UP_PROJ_ALL_GATHER,
-            layer_id=layer_id)
+            layer_id=layer_id,
+        )
         self.down_proj = RowParallelLinear(
             intermediate_size,
             hidden_size,
@@ -82,16 +85,19 @@ class LlamaMLP(nn.Module):
             input_is_parallel=True,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.
-            MLP_DOWN_PROJ_ALL_REDUCE,
-            layer_id=layer_id)
+            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE,
+            layer_id=layer_id,
+        )
         if hidden_act != "silu":
-            raise ValueError(f"Unsupported activation: {hidden_act}. "
-                             "Only silu is supported for now.")
+            raise ValueError(
+                f"Unsupported activation: {hidden_act}. "
+                "Only silu is supported for now."
+            )
         self.act_fn = SiluAndMul()
 
-        self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION,
-                                               layer_id=layer_id)
+        self._mlp_activation_timer = CudaTimer(
+            OperationMetrics.MLP_ACTIVATION, layer_id=layer_id
+        )
 
     def forward(self, x):
         gate_up, _ = self.gate_up_proj(x)
@@ -103,14 +109,16 @@ class LlamaMLP(nn.Module):
 
 class LlamaAttention(nn.Module):
 
-    def __init__(self,
-                 hidden_size: int,
-                 num_heads: int,
-                 num_kv_heads: int,
-                 rope_theta: float = 10000,
-                 rope_scaling: Optional[Dict[str, Any]] = None,
-                 max_position_embeddings: int = 8192,
-                 layer_id: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        hidden_size: int,
+        num_heads: int,
+        num_kv_heads: int,
+        rope_theta: float = 10000,
+        rope_scaling: Optional[Dict[str, Any]] = None,
+        max_position_embeddings: int = 8192,
+        layer_id: Optional[int] = None,
+    ) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         tp_size = get_tensor_model_parallel_world_size()
@@ -130,14 +138,12 @@ class LlamaAttention(nn.Module):
 
         self.qkv_proj = ColumnParallelLinear(
             hidden_size,
-            (self.total_num_heads + 2 * self.total_num_kv_heads) *
-            self.head_dim,
+            (self.total_num_heads + 2 * self.total_num_kv_heads) * self.head_dim,
             bias=False,
             gather_output=False,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.ATTN_PRE_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_PRE_PROJ_ALL_GATHER,
+            communication_metric_name=OperationMetrics.ATTN_PRE_PROJ_ALL_GATHER,
             layer_id=layer_id,
         )
         self.o_proj = RowParallelLinear(
@@ -147,8 +153,7 @@ class LlamaAttention(nn.Module):
             input_is_parallel=True,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.ATTN_POST_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_POST_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.ATTN_POST_PROJ_ALL_REDUCE,
             layer_id=layer_id,
         )
         self.rotary_emb = get_rope(
@@ -195,8 +200,7 @@ class LlamaDecoderLayer(nn.Module):
         # Requires transformers > 4.32.0
         rope_theta = getattr(config, "rope_theta", 10000)
         rope_scaling = getattr(config, "rope_scaling", None)
-        max_position_embeddings = getattr(config, "max_position_embeddings",
-                                          8192)
+        max_position_embeddings = getattr(config, "max_position_embeddings", 8192)
         self.self_attn = LlamaAttention(
             hidden_size=self.hidden_size,
             num_heads=config.num_attention_heads,
@@ -216,12 +220,14 @@ class LlamaDecoderLayer(nn.Module):
             config.hidden_size,
             eps=config.rms_norm_eps,
             norm_name=OperationMetrics.INPUT_LAYERNORM,
-            layer_id=layer_id)
+            layer_id=layer_id,
+        )
         self.post_attention_layernorm = RMSNorm(
             config.hidden_size,
             eps=config.rms_norm_eps,
             norm_name=OperationMetrics.POST_ATTENTION_LAYERNORM,
-            layer_id=layer_id)
+            layer_id=layer_id,
+        )
 
     def forward(
         self,
@@ -269,13 +275,16 @@ class LlamaModel(nn.Module):
                 communication_metric_name=OperationMetrics.EMBED_ALL_REDUCE,
             )
 
-        num_layers = config.num_hidden_layers // get_pipeline_model_parallel_world_size(
+        num_layers = (
+            config.num_hidden_layers // get_pipeline_model_parallel_world_size()
         )
         layer_offset = get_pipeline_model_parallel_rank() * num_layers
-        self.layers = nn.ModuleList([
-            LlamaDecoderLayer(config, layer_id=layer_id + layer_offset)
-            for layer_id in range(num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                LlamaDecoderLayer(config, layer_id=layer_id + layer_offset)
+                for layer_id in range(num_layers)
+            ]
+        )
 
         self.norm = None
         if is_pipeline_last_stage():
@@ -320,11 +329,13 @@ class LlamaForCausalLM(nn.Module):
 
         self.lm_head = None
         if self.is_pipeline_last_stage:
-            self.lm_head = ColumnParallelLinear(config.hidden_size,
-                                                vocab_size,
-                                                bias=False,
-                                                gather_output=False,
-                                                perform_initialization=False)
+            self.lm_head = ColumnParallelLinear(
+                config.hidden_size,
+                vocab_size,
+                bias=False,
+                gather_output=False,
+                perform_initialization=False,
+            )
 
     def forward(
         self,
@@ -351,11 +362,13 @@ class LlamaForCausalLM(nn.Module):
     _column_parallel_layers = []
     _row_parallel_layers = ["o_proj", "down_proj"]
 
-    def load_weights(self,
-                     model_name_or_path: str,
-                     cache_dir: Optional[str] = None,
-                     load_format: str = "auto",
-                     revision: Optional[str] = None):
+    def load_weights(
+        self,
+        model_name_or_path: str,
+        cache_dir: Optional[str] = None,
+        load_format: str = "auto",
+        revision: Optional[str] = None,
+    ):
         weight_suffixes = ["weight"]
 
         column_parallel_weights: List[str] = []
@@ -378,30 +391,33 @@ class LlamaForCausalLM(nn.Module):
         first_layer_id = layers_per_stage * pp_model_parallel_rank
         last_layer_id = layers_per_stage * (pp_model_parallel_rank + 1) - 1
 
-        q_proj_shard_size = (self.config.hidden_size // tp_size)
-        kv_proj_shard_size = (self.config.hidden_size //
-                              self.config.num_attention_heads *
-                              self.config.num_key_value_heads // tp_size)
+        q_proj_shard_size = self.config.hidden_size // tp_size
+        kv_proj_shard_size = (
+            self.config.hidden_size
+            // self.config.num_attention_heads
+            * self.config.num_key_value_heads
+            // tp_size
+        )
         attention_weight_specs = [
             # (weight_name, shard_size, offset)
             ("q_proj", q_proj_shard_size, 0),
             ("k_proj", kv_proj_shard_size, q_proj_shard_size),
-            ("v_proj", kv_proj_shard_size,
-             q_proj_shard_size + kv_proj_shard_size),
+            ("v_proj", kv_proj_shard_size, q_proj_shard_size + kv_proj_shard_size),
         ]
         state_dict = self.state_dict()
 
         for name, loaded_weight in hf_model_weights_iterator(
-                model_name_or_path, cache_dir, load_format, revision):
+            model_name_or_path, cache_dir, load_format, revision
+        ):
             if "rotary_emb.inv_freq" in name:
                 continue
 
-            if pp_model_parallel_rank != 0 \
-                    and "embed_tokens" in name:
+            if pp_model_parallel_rank != 0 and "embed_tokens" in name:
                 continue
 
-            if pp_model_parallel_rank != pp_size - 1 \
-                    and ("lm_head" in name or name == "model.norm.weight"):
+            if pp_model_parallel_rank != pp_size - 1 and (
+                "lm_head" in name or name == "model.norm.weight"
+            ):
                 continue
 
             if "model.layers" in name:
@@ -419,9 +435,11 @@ class LlamaForCausalLM(nn.Module):
                 param = state_dict[name.replace(weight_name, "qkv_proj")]
 
                 loaded_weight = loaded_weight[
-                    shard_size * tensor_model_parallel_rank:shard_size *
-                    (tensor_model_parallel_rank + 1)]
-                param_slice = param.data[offset:offset + shard_size]
+                    shard_size
+                    * tensor_model_parallel_rank : shard_size
+                    * (tensor_model_parallel_rank + 1)
+                ]
+                param_slice = param.data[offset : offset + shard_size]
                 assert param_slice.shape == loaded_weight.shape
 
                 param_slice.copy_(loaded_weight)
@@ -438,10 +456,13 @@ class LlamaForCausalLM(nn.Module):
 
                 shard_size = param.shape[0] // 2
                 loaded_weight = loaded_weight[
-                    shard_size * tensor_model_parallel_rank:shard_size *
-                    (tensor_model_parallel_rank + 1)]
-                param_slice = param.data[shard_size * stride_id:shard_size *
-                                         (stride_id + 1)]
+                    shard_size
+                    * tensor_model_parallel_rank : shard_size
+                    * (tensor_model_parallel_rank + 1)
+                ]
+                param_slice = param.data[
+                    shard_size * stride_id : shard_size * (stride_id + 1)
+                ]
                 assert param_slice.shape == loaded_weight.shape
                 param_slice.copy_(loaded_weight)
                 is_gate_up_weight = True
@@ -452,11 +473,16 @@ class LlamaForCausalLM(nn.Module):
             param = state_dict[name]
 
             if "embed_tokens" in name or "lm_head" in name:
-                load_padded_tensor_parallel_vocab(param, loaded_weight,
-                                                  tensor_model_parallel_rank)
+                load_padded_tensor_parallel_vocab(
+                    param, loaded_weight, tensor_model_parallel_rank
+                )
                 continue
 
-            load_tensor_parallel_weights(param, loaded_weight, name,
-                                         column_parallel_weights,
-                                         row_parallel_weights,
-                                         tensor_model_parallel_rank)
+            load_tensor_parallel_weights(
+                param,
+                loaded_weight,
+                name,
+                column_parallel_weights,
+                row_parallel_weights,
+                tensor_model_parallel_rank,
+            )

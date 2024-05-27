@@ -1,5 +1,7 @@
+from sarathi.core.block_space_manager.base_block_space_manager import (
+    BaseBlockSpaceManager,
+)
 from sarathi.core.datatypes.sequence import Sequence
-from sarathi.core.block_space_manager.base_block_space_manager import BaseBlockSpaceManager
 
 
 class VLLMBlockSpaceManager(BaseBlockSpaceManager):

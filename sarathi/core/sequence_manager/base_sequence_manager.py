@@ -1,15 +1,15 @@
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from sarathi.core.datatypes.sequence import (
-    Sequence,
-    SequenceScheduleMetadata,
-    SequenceMetadata,
-    SamplerOutput,
-    SamplerOutputs,
-)
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
+from sarathi.core.datatypes.sequence import (
+    SamplerOutput,
+    SamplerOutputs,
+    Sequence,
+    SequenceMetadata,
+    SequenceScheduleMetadata,
+)
 from sarathi.core.datatypes.sequence_status import SequenceStatus
 from sarathi.utils.threading_utils import synchronized
 
@@ -46,8 +46,7 @@ class BaseSequenceManager(ABC):
         assert seq.is_waiting() or seq.is_paused()
         seq.set_status(SequenceStatus.RUNNING)
 
-    def _on_seq_scheduled(
-            self, seq_sched_metadata: SequenceScheduleMetadata) -> None:
+    def _on_seq_scheduled(self, seq_sched_metadata: SequenceScheduleMetadata) -> None:
         assert seq_sched_metadata.seq_id in self.seq_map
         self._resume_seq(seq_sched_metadata.seq_id)
 
@@ -75,8 +74,12 @@ class BaseSequenceManager(ABC):
             self._on_seq_scheduled(seq_sched_metadata)
             seq = self.seq_map[seq_sched_metadata.seq_id]
             seq_metadata_list.append(
-                SequenceMetadata(seq, self._get_block_table(seq),
-                                 seq_sched_metadata.num_prompt_tokens))
+                SequenceMetadata(
+                    seq,
+                    self._get_block_table(seq),
+                    seq_sched_metadata.num_prompt_tokens,
+                )
+            )
 
         return ignored_seqs, seq_metadata_list
 
@@ -84,8 +87,9 @@ class BaseSequenceManager(ABC):
     def _on_append_token(self, seq: Sequence) -> None:
         pass
 
-    def _process_seq_output(self, seq_id: int, sample: SamplerOutput,
-                            prompt_chunk_len: int) -> None:
+    def _process_seq_output(
+        self, seq_id: int, sample: SamplerOutput, prompt_chunk_len: int
+    ) -> None:
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]
         # at this point, the seq should be in paused state
@@ -110,8 +114,8 @@ class BaseSequenceManager(ABC):
         sampler_outputs: Optional[SamplerOutputs],
     ) -> None:
         for scheduled_seq_metadata, sampler_output in zip(
-                scheduler_outputs.scheduled_seq_metadata_list,
-                sampler_outputs):
+            scheduler_outputs.scheduled_seq_metadata_list, sampler_outputs
+        ):
             seq = self.seq_map[scheduled_seq_metadata.seq_id]
             if seq.is_waiting():
                 # seq is preempted

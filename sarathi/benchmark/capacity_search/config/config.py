@@ -188,24 +188,26 @@ class JobConfig:
     def generate_job_configs(cls, config: dict):
         job_configs = []
         for (
-                model_config,
-                trace_config,
-                scheduler_config,
-                parallel_config,
+            model_config,
+            trace_config,
+            scheduler_config,
+            parallel_config,
         ) in product(
-                config["models"],
-                config["traces"],
-                config["schedulers"],
-                config["parallel_spec"],
+            config["models"],
+            config["traces"],
+            config["schedulers"],
+            config["parallel_spec"],
         ):
             model_config = ModelConfig(**model_config)
             trace_config = TraceConfig(**trace_config)
             scheduler_config = SchedulerConfig(**scheduler_config)
             parallel_config = ParallelConfig(**parallel_config)
 
-            if not model_config.is_parallel_spec_valid(parallel_config.name) \
-                    or not model_config.is_scheduler_spec_valid(scheduler_config.name) \
-                    or not model_config.is_traces_valid(trace_config.name):
+            if (
+                not model_config.is_parallel_spec_valid(parallel_config.name)
+                or not model_config.is_scheduler_spec_valid(scheduler_config.name)
+                or not model_config.is_traces_valid(trace_config.name)
+            ):
                 continue
 
             job_config = cls(
@@ -276,4 +278,6 @@ class BenchmarkConfig:
         return f"{self.job_config.get_human_readable_name()}, QPS: {self.qps}, Run id: {self.get_run_id()}"
 
     def get_run_dir(self):
-        return f"{self.output_dir}/runs/{_get_hash(self.job_config.get_key())}/{self.qps}"
+        return (
+            f"{self.output_dir}/runs/{_get_hash(self.job_config.get_key())}/{self.qps}"
+        )

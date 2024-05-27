@@ -1,17 +1,23 @@
 """A GPU worker class."""
-from threading import Thread
-from typing import Tuple, Optional
+
 from queue import Queue
+from threading import Thread
+from typing import Optional, Tuple
 
 import torch
 import torch.distributed
 
-from sarathi.config import (CacheConfig, ModelConfig, ParallelConfig,
-                            MetricsConfig, BaseSchedulerConfig)
-from sarathi.core.datatypes.sequence import SamplerOutputs
-from sarathi.utils.threading_utils import synchronized, exit_on_error
-from sarathi.logger import init_logger
+from sarathi.config import (
+    BaseSchedulerConfig,
+    CacheConfig,
+    MetricsConfig,
+    ModelConfig,
+    ParallelConfig,
+)
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
+from sarathi.core.datatypes.sequence import SamplerOutputs
+from sarathi.logger import init_logger
+from sarathi.utils.threading_utils import exit_on_error, synchronized
 from sarathi.worker.base_worker import BaseWorker
 
 logger = init_logger(__name__)
@@ -36,13 +42,19 @@ class PipelineParallelWorker(BaseWorker):
         rank: Optional[int] = None,
         distributed_init_method: Optional[str] = None,
     ) -> None:
-        super().__init__(model_config, parallel_config, scheduler_config,
-                         cache_config, metrics_config, local_rank, rank,
-                         distributed_init_method)
+        super().__init__(
+            model_config,
+            parallel_config,
+            scheduler_config,
+            cache_config,
+            metrics_config,
+            local_rank,
+            rank,
+            distributed_init_method,
+        )
         self.execution_queue = Queue()
         self.output_queue = Queue()
-        self.execution_thread = Thread(target=self._execution_loop,
-                                       daemon=True)
+        self.execution_thread = Thread(target=self._execution_loop, daemon=True)
 
     def _verify_parallel_config(self) -> None:
         assert self.parallel_config.pipeline_parallel_size > 1
@@ -57,15 +69,17 @@ class PipelineParallelWorker(BaseWorker):
     ) -> None:
         self.execution_queue.put(scheduler_outputs)
 
-    def on_step_completed(self, scheduler_outputs: SchedulerOutputs,
-                          sampler_outputs: SamplerOutputs) -> None:
+    def on_step_completed(
+        self, scheduler_outputs: SchedulerOutputs, sampler_outputs: SamplerOutputs
+    ) -> None:
         # in pipeline parallel case, each stage won't have sampler output
         # so we need to do the book keeping update later
         pass
 
     @synchronized
-    def on_sampling_completed(self, scheduler_outputs: SchedulerOutputs,
-                              sampler_outputs: SamplerOutputs) -> None:
+    def on_sampling_completed(
+        self, scheduler_outputs: SchedulerOutputs, sampler_outputs: SamplerOutputs
+    ) -> None:
         self.seq_manager.on_step_completed(scheduler_outputs, sampler_outputs)
 
     @exit_on_error

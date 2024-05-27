@@ -38,7 +38,11 @@ If not, please file a new issue, providing as much relevant information as possi
 
 In general, we adhere to [Google Python style guide](https://google.github.io/styleguide/pyguide.html) and [Google C++ style guide](https://google.github.io/styleguide/cppguide.html).
 
-We include a formatting script [`format.sh`](./format.sh) to format the code.
+To format the code run,
+
+```sh
+make format
+```
 
 ### Pull Requests
 

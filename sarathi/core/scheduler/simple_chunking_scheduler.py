@@ -3,12 +3,14 @@ from enum import Enum, auto
 from typing import List
 
 from sarathi.config import CacheConfig, SimpleChunkingSchedulerConfig
-from sarathi.logger import init_logger
+from sarathi.core.block_space_manager.vllm_block_space_manager import (
+    VLLMBlockSpaceManager,
+)
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import Sequence, SequenceScheduleMetadata
 from sarathi.core.datatypes.sequence_status import SequenceStatus
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.block_space_manager.vllm_block_space_manager import VLLMBlockSpaceManager
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -34,13 +36,15 @@ class SimpleChunkingScheduler(BaseScheduler):
     def get_block_space_manager_class(self):
         return VLLMBlockSpaceManager
 
-    def _get_seq_next_num_prefill_tokens(self, seq: Sequence,
-                                         num_batched_tokens: int) -> int:
+    def _get_seq_next_num_prefill_tokens(
+        self, seq: Sequence, num_batched_tokens: int
+    ) -> int:
         assert not seq.is_finished()
 
         next_num_tokens = min(
             seq.get_prompt_len() - seq.get_num_prompt_tokens_processed(),
-            self.chunk_size - num_batched_tokens)
+            self.chunk_size - num_batched_tokens,
+        )
 
         return next_num_tokens
 
@@ -75,7 +79,8 @@ class SimpleChunkingScheduler(BaseScheduler):
                 continue
 
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
-                seq, num_batched_tokens)
+                seq, num_batched_tokens
+            )
 
             if next_num_prefill_tokens == 0:
                 # not enough token space to allocate the sequence
@@ -86,7 +91,9 @@ class SimpleChunkingScheduler(BaseScheduler):
             running.append(seq)
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
-                    seq, prompt_chunk_len=next_num_prefill_tokens))
+                    seq, prompt_chunk_len=next_num_prefill_tokens
+                )
+            )
 
         if running:
             assert not self.running
@@ -121,7 +128,8 @@ class SimpleChunkingScheduler(BaseScheduler):
                 break
 
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
-                seq, num_batched_tokens)
+                seq, num_batched_tokens
+            )
 
             if next_num_prefill_tokens == 0:
                 # not enough space to allocate the sequence
@@ -133,7 +141,9 @@ class SimpleChunkingScheduler(BaseScheduler):
             num_batched_tokens += next_num_prefill_tokens
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
-                    seq, prompt_chunk_len=next_num_prefill_tokens))
+                    seq, prompt_chunk_len=next_num_prefill_tokens
+                )
+            )
 
         if scheduled_seq_metadata_list or ignored_seq_ids:
             self.whose_turn = Turn.DECODE
@@ -175,7 +185,8 @@ class SimpleChunkingScheduler(BaseScheduler):
                 self._append_slot(seq)
                 running.append(seq)
                 scheduled_seq_metadata_list.append(
-                    SequenceScheduleMetadata.from_sequence(seq))
+                    SequenceScheduleMetadata.from_sequence(seq)
+                )
 
         self.running = running
         self.whose_turn = Turn.PREFILL

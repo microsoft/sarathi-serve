@@ -2,7 +2,8 @@ import math
 import random
 
 from sarathi.benchmark.request_generator.base_request_interval_generator import (
-    BaseRequestIntervalGenerator, )
+    BaseRequestIntervalGenerator,
+)
 
 
 class PoissonRequestIntervalGenerator(BaseRequestIntervalGenerator):

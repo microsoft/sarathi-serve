@@ -49,24 +49,31 @@ class SequenceMetricsTimeDistributions(enum.Enum):
     REQUEST_PREEMPTION_TIME = "request_preemption_time"
     REQUEST_SCHEDULING_DELAY = "request_scheduling_delay"
     REQUEST_EXECUTION_PLUS_PREEMPTION_TIME = "request_execution_plus_preemption_time"
-    REQUEST_EXECUTION_PLUS_PREEMPTION_TIME_NORMALIZED = "request_execution_plus_preemption_time_normalized"
+    REQUEST_EXECUTION_PLUS_PREEMPTION_TIME_NORMALIZED = (
+        "request_execution_plus_preemption_time_normalized"
+    )
     PREFILL_TIME_E2E = "prefill_e2e_time"
     PREFILL_TIME_E2E_NORMALIZED = "prefill_e2e_time_normalized"
-    PREFILL_TIME_E2E_PIECEWISE_NORMALIZED = (
-        "prefill_e2e_time_piecewise_normalized")
+    PREFILL_TIME_E2E_PIECEWISE_NORMALIZED = "prefill_e2e_time_piecewise_normalized"
     PREFILL_TIME_EXECUTION_PLUS_PREEMPTION = "prefill_time_execution_plus_preemption"
     PREFILL_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED = (
-        "prefill_time_execution_plus_preemption_normalized")
+        "prefill_time_execution_plus_preemption_normalized"
+    )
     DECODE_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED = (
-        "decode_time_execution_plus_preemption_normalized")
+        "decode_time_execution_plus_preemption_normalized"
+    )
 
 
 class TokenMetricsTimeDistribution(enum.Enum):
-    DECODE_TOKEN_EXECUTION_PLUS_PREEMPTION_TIME = "decode_token_execution_plus_preemption_time"
+    DECODE_TOKEN_EXECUTION_PLUS_PREEMPTION_TIME = (
+        "decode_token_execution_plus_preemption_time"
+    )
 
 
 class TokenMetricsTimeList(enum.Enum):
-    DECODE_TOKEN_EXECUTION_PLUS_PREEMPTION_TIME_LIST = "decode_token_execution_plus_preemption_time_list"
+    DECODE_TOKEN_EXECUTION_PLUS_PREEMPTION_TIME_LIST = (
+        "decode_token_execution_plus_preemption_time_list"
+    )
 
 
 class SequenceMetricsHistogram(enum.Enum):

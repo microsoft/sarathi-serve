@@ -1,11 +1,15 @@
 from sarathi.benchmark.request_generator.gamma_request_interval_generator import (
-    GammaRequestIntervalGenerator, )
+    GammaRequestIntervalGenerator,
+)
 from sarathi.benchmark.request_generator.poisson_request_interval_generator import (
-    PoissonRequestIntervalGenerator, )
+    PoissonRequestIntervalGenerator,
+)
 from sarathi.benchmark.request_generator.static_request_interval_generator import (
-    StaticRequestIntervalGenerator, )
+    StaticRequestIntervalGenerator,
+)
 from sarathi.benchmark.request_generator.trace_request_interval_generator import (
-    TraceRequestIntervalGenerator, )
+    TraceRequestIntervalGenerator,
+)
 from sarathi.benchmark.types import RequestIntervalGeneratorType
 from sarathi.utils.base_registry import BaseRegistry
 
@@ -17,11 +21,15 @@ class RequestIntervalGeneratorRegistry(BaseRegistry):
         return RequestIntervalGeneratorType.from_str(key_str)
 
 
-RequestIntervalGeneratorRegistry.register(RequestIntervalGeneratorType.GAMMA,
-                                          GammaRequestIntervalGenerator)
-RequestIntervalGeneratorRegistry.register(RequestIntervalGeneratorType.POISSON,
-                                          PoissonRequestIntervalGenerator)
-RequestIntervalGeneratorRegistry.register(RequestIntervalGeneratorType.STATIC,
-                                          StaticRequestIntervalGenerator)
-RequestIntervalGeneratorRegistry.register(RequestIntervalGeneratorType.TRACE,
-                                          TraceRequestIntervalGenerator)
+RequestIntervalGeneratorRegistry.register(
+    RequestIntervalGeneratorType.GAMMA, GammaRequestIntervalGenerator
+)
+RequestIntervalGeneratorRegistry.register(
+    RequestIntervalGeneratorType.POISSON, PoissonRequestIntervalGenerator
+)
+RequestIntervalGeneratorRegistry.register(
+    RequestIntervalGeneratorType.STATIC, StaticRequestIntervalGenerator
+)
+RequestIntervalGeneratorRegistry.register(
+    RequestIntervalGeneratorType.TRACE, TraceRequestIntervalGenerator
+)

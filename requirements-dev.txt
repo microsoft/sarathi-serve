@@ -1,11 +1,6 @@
-# formatting
-yapf==0.40.2
-pylint==2.8.2
-
-# type checking
-types-PyYAML
-types-requests
-types-setuptools
-
-# notebooks
-nbdime
+pylint
+black
+autopep8
+isort
+flake8
+make

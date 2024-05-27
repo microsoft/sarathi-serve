@@ -1,9 +1,9 @@
 import logging
+from collections import defaultdict, deque
+
 import pandas as pd
 import plotly_express as px
 import wandb
-
-from collections import defaultdict, deque
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,9 @@ class DataSeries:
         # to aid incremental updates to y datapoints
         self._last_data_y = 0
 
-    def consolidate(self, ):
+    def consolidate(
+        self,
+    ):
         res = defaultdict(list)
         for x, y in self.data_series:
             res[x].append(y)
@@ -33,8 +35,7 @@ class DataSeries:
 
         # sort by x
         self.data_series = sorted(self.data_series, key=lambda x: x[0])
-        self._last_data_y = self.data_series[-1][1] if len(
-            self.data_series) else 0
+        self._last_data_y = self.data_series[-1][1] if len(self.data_series) else 0
 
     def merge(self, other: "DataSeries"):
         if len(other) == 0:
@@ -101,8 +102,7 @@ class DataSeries:
 
     # convert list of x, y datapoints to a pandas dataframe
     def to_df(self):
-        return pd.DataFrame(self.data_series,
-                            columns=[self.x_name, self.y_name])
+        return pd.DataFrame(self.data_series, columns=[self.x_name, self.y_name])
 
     # add a new x, y datapoint as an incremental (delta) update to
     # recently collected y datapoint
@@ -111,10 +111,9 @@ class DataSeries:
         data_y = last_data_y + data_y_delta
         self.put(data_x, data_y)
 
-    def print_series_stats(self,
-                           df: pd.DataFrame,
-                           plot_name: str,
-                           y_name: str = None) -> None:
+    def print_series_stats(
+        self, df: pd.DataFrame, plot_name: str, y_name: str = None
+    ) -> None:
 
         if len(self.data_series) == 0:
             return
@@ -122,10 +121,12 @@ class DataSeries:
         if y_name is None:
             y_name = self.y_name
 
-        logger.info(f"{plot_name}: {y_name} stats:"
-                    f" min: {df[y_name].min()},"
-                    f" max: {df[y_name].max()},"
-                    f" mean: {df[y_name].mean()},")
+        logger.info(
+            f"{plot_name}: {y_name} stats:"
+            f" min: {df[y_name].min()},"
+            f" max: {df[y_name].max()},"
+            f" mean: {df[y_name].mean()},"
+        )
         if wandb.run:
             wandb.log(
                 {
@@ -136,10 +137,9 @@ class DataSeries:
                 step=0,
             )
 
-    def print_distribution_stats(self,
-                                 df: pd.DataFrame,
-                                 plot_name: str,
-                                 y_name: str = None) -> None:
+    def print_distribution_stats(
+        self, df: pd.DataFrame, plot_name: str, y_name: str = None
+    ) -> None:
 
         if len(self.data_series) == 0:
             return
@@ -147,14 +147,16 @@ class DataSeries:
         if y_name is None:
             y_name = self.y_name
 
-        logger.info(f"{plot_name}: {y_name} stats:"
-                    f" min: {df[y_name].min()},"
-                    f" max: {df[y_name].max()},"
-                    f" mean: {df[y_name].mean()},"
-                    f" median: {df[y_name].median()},"
-                    f" 95th percentile: {df[y_name].quantile(0.95)},"
-                    f" 99th percentile: {df[y_name].quantile(0.99)}"
-                    f" 99.9th percentile: {df[y_name].quantile(0.999)}")
+        logger.info(
+            f"{plot_name}: {y_name} stats:"
+            f" min: {df[y_name].min()},"
+            f" max: {df[y_name].max()},"
+            f" mean: {df[y_name].mean()},"
+            f" median: {df[y_name].median()},"
+            f" 95th percentile: {df[y_name].quantile(0.95)},"
+            f" 99th percentile: {df[y_name].quantile(0.99)}"
+            f" 99.9th percentile: {df[y_name].quantile(0.999)}"
+        )
         if wandb.run:
             wandb.log(
                 {
@@ -164,8 +166,7 @@ class DataSeries:
                     f"{plot_name}_median": df[y_name].median(),
                     f"{plot_name}_95th_percentile": df[y_name].quantile(0.95),
                     f"{plot_name}_99th_percentile": df[y_name].quantile(0.99),
-                    f"{plot_name}_99.9th_percentile":
-                    df[y_name].quantile(0.999),
+                    f"{plot_name}_99.9th_percentile": df[y_name].quantile(0.999),
                 },
                 step=0,
             )
@@ -202,11 +203,9 @@ class DataSeries:
         self.print_series_stats(df, plot_name)
 
         # change marker color to red
-        fig = px.line(df,
-                      x=self.x_name,
-                      y=self.y_name,
-                      markers=True,
-                      labels={"x": y_axis_label})
+        fig = px.line(
+            df, x=self.x_name, y=self.y_name, markers=True, labels={"x": y_axis_label}
+        )
         fig.update_traces(marker=dict(color="red", size=2))
 
         if wandb.run:
@@ -216,8 +215,7 @@ class DataSeries:
 
             wandb.log(
                 {
-                    f"{plot_name}_step":
-                    wandb.plot.line(
+                    f"{plot_name}_step": wandb.plot.line(
                         wandb.Table(dataframe=wandb_df),
                         self.x_name,
                         y_axis_label,
@@ -230,10 +228,7 @@ class DataSeries:
         fig.write_image(f"{path}/{plot_name}.png")
         self._save_df(df, path, plot_name)
 
-    def plot_cdf(self,
-                 path: str,
-                 plot_name: str,
-                 y_axis_label: str = None) -> None:
+    def plot_cdf(self, path: str, plot_name: str, y_axis_label: str = None) -> None:
 
         if len(self.data_series) == 0:
             return
@@ -249,11 +244,9 @@ class DataSeries:
         # sort by cdf
         df = df.sort_values(by=["cdf"])
 
-        fig = px.line(df,
-                      x=self.y_name,
-                      y="cdf",
-                      markers=True,
-                      labels={"x": y_axis_label})
+        fig = px.line(
+            df, x=self.y_name, y="cdf", markers=True, labels={"x": y_axis_label}
+        )
         fig.update_traces(marker=dict(color="red", size=2))
 
         if wandb.run:
@@ -263,8 +256,7 @@ class DataSeries:
 
             wandb.log(
                 {
-                    f"{plot_name}_cdf":
-                    wandb.plot.line(
+                    f"{plot_name}_cdf": wandb.plot.line(
                         wandb.Table(dataframe=wandb_df),
                         "cdf",
                         y_axis_label,
@@ -290,8 +282,7 @@ class DataSeries:
         # wandb histogram is highly inaccurate so we need to generate the histogram
         # ourselves and then use wandb bar chart
 
-        histogram_df = df[self.y_name].value_counts(bins=25,
-                                                    sort=False).sort_index()
+        histogram_df = df[self.y_name].value_counts(bins=25, sort=False).sort_index()
         histogram_df = histogram_df.reset_index()
         histogram_df.columns = ["Bins", "count"]
         histogram_df["Bins"] = histogram_df["Bins"].apply(lambda x: x.mid)
@@ -304,8 +295,7 @@ class DataSeries:
         if wandb.run:
             wandb.log(
                 {
-                    f"{plot_name}_histogram":
-                    wandb.plot.bar(
+                    f"{plot_name}_histogram": wandb.plot.bar(
                         wandb.Table(dataframe=histogram_df),
                         "Bins",
                         "Percentage",  # wandb plots are horizontal

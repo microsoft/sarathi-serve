@@ -16,6 +16,7 @@ class RequestOutput:
         outputs: The output sequences of the request.
         finished: Whether the whole request is finished.
     """
+
     seq_id: str
     prompt: str
     prompt_token_ids: List[int]
@@ -26,7 +27,12 @@ class RequestOutput:
 
     @classmethod
     def from_seq(cls, seq: Sequence) -> "RequestOutput":
-        return cls(seq.seq_id, seq.prompt, seq.prompt_token_ids,
-                   seq.output_text, seq.get_output_token_ids(),
-                   seq.is_finished(),
-                   SequenceStatus.get_finished_reason(seq.get_status()))
+        return cls(
+            seq.seq_id,
+            seq.prompt,
+            seq.prompt_token_ids,
+            seq.output_text,
+            seq.get_output_token_ids(),
+            seq.is_finished(),
+            SequenceStatus.get_finished_reason(seq.get_status()),
+        )

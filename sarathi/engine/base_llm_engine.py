@@ -2,24 +2,28 @@ import copy
 import math
 import time
 from functools import partial
-from typing import Any, List, Optional, Tuple, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
-from sarathi.config import (CacheConfig, MetricsConfig, ModelConfig,
-                            ParallelConfig, BaseSchedulerConfig)
+from sarathi.config import (
+    BaseSchedulerConfig,
+    CacheConfig,
+    MetricsConfig,
+    ModelConfig,
+    ParallelConfig,
+)
+from sarathi.core.datatypes.request_output import RequestOutput
+from sarathi.core.datatypes.sampling_params import SamplingParams
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
+from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence, SequenceMetadata
 from sarathi.core.scheduler.scheduler_registry import SchedulerRegistry
+from sarathi.core.sequence_manager.engine_sequence_manager import EngineSequenceManager
 from sarathi.engine.ray_utils import RayWorker, initialize_cluster, ray
 from sarathi.logger import init_logger
 from sarathi.metrics.constants import CpuOperationMetrics
 from sarathi.metrics.cpu_timer import CpuTimer
 from sarathi.metrics.metrics_store import MetricsStore
-from sarathi.core.datatypes.request_output import RequestOutput
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.datatypes.sampling_params import SamplingParams
-from sarathi.core.datatypes.sequence import (SamplerOutputs, Sequence,
-                                             SequenceMetadata)
 from sarathi.transformers_utils.tokenizer import get_tokenizer
-from sarathi.core.sequence_manager.engine_sequence_manager import EngineSequenceManager
-from sarathi.utils import Counter, unset_cuda_visible_devices, get_ip, get_random_port
+from sarathi.utils import Counter, get_ip, get_random_port, unset_cuda_visible_devices
 
 logger = init_logger(__name__)
 
@@ -70,7 +74,8 @@ class BaseLLMEngine:
             f"load_format={model_config.load_format}, "
             f"tensor_parallel_size={parallel_config.tensor_parallel_size}, "
             f"pipeline_parallel_size={parallel_config.pipeline_parallel_size}, "
-            f"seed={model_config.seed})")
+            f"seed={model_config.seed})"
+        )
         # TODO(woosuk): Print more configs in debug mode.
 
         self.model_config = model_config
@@ -84,7 +89,8 @@ class BaseLLMEngine:
             model_config.tokenizer,
             tokenizer_mode=model_config.tokenizer_mode,
             trust_remote_code=model_config.trust_remote_code,
-            revision=model_config.revision)
+            revision=model_config.revision,
+        )
 
         self.seq_manager = EngineSequenceManager(self.tokenizer)
         self.seq_counter = Counter()
@@ -108,12 +114,14 @@ class BaseLLMEngine:
         self.mark_initial_memory_profiling_done()
 
         # Create the scheduler.
-        self.scheduler = SchedulerRegistry.get(scheduler_config.type,
-                                               scheduler_config, cache_config)
+        self.scheduler = SchedulerRegistry.get(
+            scheduler_config.type, scheduler_config, cache_config
+        )
 
         self._scheduler_timer = CpuTimer(CpuOperationMetrics.SCHEDULE)
         self._process_model_outputs_timer = CpuTimer(
-            CpuOperationMetrics.PROCESS_MODEL_OUTPUTS)
+            CpuOperationMetrics.PROCESS_MODEL_OUTPUTS
+        )
 
     def _validate_parallel_config(self) -> None:
         assert self.parallel_config.pipeline_parallel_size == 1
@@ -121,7 +129,10 @@ class BaseLLMEngine:
     def _get_worker_impl(self):
         # Lazy import the Worker to avoid importing torch.cuda/xformers
         # before CUDA_VISIBLE_DEVICES is set in the Worker
-        from sarathi.worker.base_worker import BaseWorker  # pylint: disable=import-outside-toplevel
+        from sarathi.worker.base_worker import (
+            BaseWorker,  # pylint: disable=import-outside-toplevel
+        )
+
         return BaseWorker
 
     def _init_workers_ray(self, **ray_remote_kwargs):
@@ -151,7 +162,8 @@ class BaseLLMEngine:
                 )
             else:
                 worker_class = worker_class.options(
-                    max_concurrency=_MAX_WORKER_CONCURRENCY, )
+                    max_concurrency=_MAX_WORKER_CONCURRENCY,
+                )
 
             if rank == 0:
                 if node_ip:
@@ -193,7 +205,8 @@ class BaseLLMEngine:
                     local_rank,
                     rank,
                     distributed_init_method,
-                ))
+                )
+            )
             ray.get(promise)
 
         self._run_workers(
@@ -223,22 +236,26 @@ class BaseLLMEngine:
         logger.info(f"# GPU blocks: {num_gpu_blocks}")
 
         if num_gpu_blocks <= 0:
-            raise ValueError("No available memory for the cache blocks. "
-                             "Try increasing `gpu_memory_utilization` when "
-                             "initializing the engine.")
-        max_blocks_per_request = math.ceil(self.model_config.max_model_len /
-                                           self.cache_config.block_size)
+            raise ValueError(
+                "No available memory for the cache blocks. "
+                "Try increasing `gpu_memory_utilization` when "
+                "initializing the engine."
+            )
+        max_blocks_per_request = math.ceil(
+            self.model_config.max_model_len / self.cache_config.block_size
+        )
         if num_gpu_blocks < max_blocks_per_request:
             raise ValueError(
                 f"Not enough available memory to schedule a request will maximum allowed length {self.model_config.max_model_len}. "
                 f"Need {max_blocks_per_request}, available {num_gpu_blocks} gpu blocks. "
-                f"Try decreasing `max_batch_size`, `max_model_len`.")
+                f"Try decreasing `max_batch_size`, `max_model_len`."
+            )
         self.cache_config.num_gpu_blocks = num_gpu_blocks
 
         # Initialize the cache.
-        self._run_workers("init_cache_engine",
-                          cache_config=self.cache_config,
-                          get_all_outputs=True)
+        self._run_workers(
+            "init_cache_engine", cache_config=self.cache_config, get_all_outputs=True
+        )
 
     def _init_worker_map(self) -> None:
         model_parallel_ranks = self._run_workers(
@@ -246,10 +263,7 @@ class BaseLLMEngine:
             get_all_outputs=True,
         )
 
-        self.worker_map = {
-            mp_rank: i
-            for i, mp_rank in enumerate(model_parallel_ranks)
-        }
+        self.worker_map = {mp_rank: i for i, mp_rank in enumerate(model_parallel_ranks)}
 
     def _on_step_completed(
         self,
@@ -275,7 +289,8 @@ class BaseLLMEngine:
             batch_end_time=end_time,
         )
         all_request_outputs = self.seq_manager.generate_request_outputs(
-            ignored_seqs, seq_metadata_list)
+            ignored_seqs, seq_metadata_list
+        )
         return all_request_outputs
 
     def add_request(
@@ -312,8 +327,15 @@ class BaseLLMEngine:
         block_size = self.cache_config.block_size
         eos_token_id = self.tokenizer.eos_token_id
         seq_id = next(self.seq_counter)
-        seq = Sequence(seq_id, prompt, prompt_token_ids, block_size,
-                       eos_token_id, arrival_time, sampling_params)
+        seq = Sequence(
+            seq_id,
+            prompt,
+            prompt_token_ids,
+            block_size,
+            eos_token_id,
+            arrival_time,
+            sampling_params,
+        )
         # Add the sequence to the scheduler.
         self.seq_manager.add_seq(seq)
         self._run_workers(
@@ -350,16 +372,21 @@ class BaseLLMEngine:
             return []
 
         ignored_seqs, seq_metadata_list = self.seq_manager.on_schedule(
-            scheduler_outputs)
+            scheduler_outputs
+        )
 
         sampler_outputs = self._run_workers(
             "execute_model",
             scheduler_outputs=scheduler_outputs,
         )
 
-        return self._on_step_completed(scheduler_outputs, ignored_seqs,
-                                       seq_metadata_list, sampler_outputs,
-                                       start_time)
+        return self._on_step_completed(
+            scheduler_outputs,
+            ignored_seqs,
+            seq_metadata_list,
+            sampler_outputs,
+            start_time,
+        )
 
     def _run_workers(
         self,
@@ -427,8 +454,7 @@ class BaseLLMEngine:
 
     def mark_initial_memory_profiling_done(self):
         self.metrics_store.mark_initial_memory_profiling_done()
-        self._run_workers("mark_initial_memory_profiling_done",
-                          get_all_outputs=True)
+        self._run_workers("mark_initial_memory_profiling_done", get_all_outputs=True)
 
     def reset_metrics(self) -> None:
         self.scheduler.reset_state()

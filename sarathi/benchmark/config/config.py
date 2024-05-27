@@ -4,19 +4,19 @@ import os
 
 import yaml
 
-from sarathi.logger import init_logger
 from sarathi.benchmark.constants import DEFAULT_CONFIG_FILE
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
 
 def custom_bool(val):
-    if val.lower() in ('yes', 'true', 't', 'y', '1'):
+    if val.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif val.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif val.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 class Config:
@@ -28,7 +28,7 @@ class Config:
         return self._args.get(name, None)
 
     def __reduce__(self):
-        return self.__class__, (self._args, )
+        return self.__class__, (self._args,)
 
 
 class ConfigParser:
@@ -67,22 +67,20 @@ class ConfigParser:
                     self._parser.add_argument(
                         f"--{arg_name}",
                         type=custom_bool,
-                        nargs='?',
+                        nargs="?",
                         const=True,
                         default=value,
                     )
                 elif arg_name in [
-                        "model_max_model_len",
-                        "vllm_scheduler_max_tokens_in_batch",
-                        "time_limit",
+                    "model_max_model_len",
+                    "vllm_scheduler_max_tokens_in_batch",
+                    "time_limit",
                 ]:
-                    self._parser.add_argument(f"--{arg_name}",
-                                              default=value,
-                                              type=int)
+                    self._parser.add_argument(f"--{arg_name}", default=value, type=int)
                 else:
-                    self._parser.add_argument(f"--{arg_name}",
-                                              default=value,
-                                              type=type(value))
+                    self._parser.add_argument(
+                        f"--{arg_name}", default=value, type=type(value)
+                    )
 
     def get_config(self):
         return Config(self._args.__dict__)
@@ -91,8 +89,7 @@ class ConfigParser:
         return yaml.dump(self._args.__dict__, default_flow_style=False)
 
     def _write_yaml_to_file(self):
-        with open(f"{self._args.output_dir}/benchmark_config.yml",
-                  "w") as file:
+        with open(f"{self._args.output_dir}/benchmark_config.yml", "w") as file:
             file.write(self.get_yaml())
 
     def to_dict(self):

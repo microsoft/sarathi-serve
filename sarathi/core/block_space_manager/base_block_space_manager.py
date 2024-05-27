@@ -1,6 +1,7 @@
 """A block manager that manages token blocks."""
-from typing import Dict, List
+
 from abc import ABC, abstractmethod
+from typing import Dict, List
 
 from sarathi.core.datatypes.block import PhysicalTokenBlock
 from sarathi.core.datatypes.sequence import Sequence

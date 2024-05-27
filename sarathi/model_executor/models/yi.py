@@ -28,31 +28,33 @@ from typing import Any, Dict, List, Optional
 
 import torch
 from torch import nn
-from sarathi.transformers_utils.configs.yi import YiConfig
 
+from sarathi.metrics.constants import OperationMetrics
+from sarathi.metrics.cuda_timer import CudaTimer
+from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.activation import SiluAndMul
 from sarathi.model_executor.layers.layernorm import RMSNorm
-from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.model_executor.layers.rotary_embedding import get_rope
 from sarathi.model_executor.parallel_utils.parallel_state import (
-    get_tensor_model_parallel_rank,
-    get_tensor_model_parallel_world_size,
     get_pipeline_model_parallel_rank,
     get_pipeline_model_parallel_world_size,
+    get_tensor_model_parallel_rank,
+    get_tensor_model_parallel_world_size,
     is_pipeline_first_stage,
     is_pipeline_last_stage,
 )
-from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import (
-    send,
-    recv,
-)
+from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import recv, send
 from sarathi.model_executor.parallel_utils.tensor_parallel import (
-    VocabParallelEmbedding, ColumnParallelLinear, RowParallelLinear)
+    ColumnParallelLinear,
+    RowParallelLinear,
+    VocabParallelEmbedding,
+)
 from sarathi.model_executor.weight_utils import (
-    hf_model_weights_iterator, load_tensor_parallel_weights,
-    load_padded_tensor_parallel_vocab)
-from sarathi.metrics.constants import OperationMetrics
-from sarathi.metrics.cuda_timer import CudaTimer
-from sarathi.model_executor.layers.rotary_embedding import get_rope
+    hf_model_weights_iterator,
+    load_padded_tensor_parallel_vocab,
+    load_tensor_parallel_weights,
+)
+from sarathi.transformers_utils.configs.yi import YiConfig
 from sarathi.worker.cache_engine import KVCache
 
 
@@ -71,18 +73,21 @@ class YiMLP(nn.Module):
             bias=False,
             gather_output=False,
             linear_metric_name=OperationMetrics.MLP_UP_PROJ,
-            communication_metric_name=OperationMetrics.MLP_UP_PROJ_ALL_GATHER)
+            communication_metric_name=OperationMetrics.MLP_UP_PROJ_ALL_GATHER,
+        )
         self.down_proj = RowParallelLinear(
             intermediate_size,
             hidden_size,
             bias=False,
             input_is_parallel=True,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE
+            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE,
         )
         if hidden_act != "silu":
-            raise ValueError(f"Unsupported activation: {hidden_act}. "
-                             "Only silu is supported for now.")
+            raise ValueError(
+                f"Unsupported activation: {hidden_act}. "
+                "Only silu is supported for now."
+            )
         self.act_fn = SiluAndMul()
         self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION)
 
@@ -131,14 +136,12 @@ class YiAttention(nn.Module):
 
         self.qkv_proj = ColumnParallelLinear(
             hidden_size,
-            (self.total_num_heads +
-             2 * self.total_num_kv_heads * num_kv_heads_replicas) *
-            self.head_dim,
+            (self.total_num_heads + 2 * self.total_num_kv_heads * num_kv_heads_replicas)
+            * self.head_dim,
             bias=False,
             gather_output=False,
             linear_metric_name=OperationMetrics.ATTN_PRE_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_PRE_PROJ_ALL_GATHER,
+            communication_metric_name=OperationMetrics.ATTN_PRE_PROJ_ALL_GATHER,
         )
         self.o_proj = RowParallelLinear(
             self.total_num_heads * self.head_dim,
@@ -146,8 +149,7 @@ class YiAttention(nn.Module):
             bias=False,
             input_is_parallel=True,
             linear_metric_name=OperationMetrics.ATTN_POST_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_POST_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.ATTN_POST_PROJ_ALL_REDUCE,
         )
         self.rotary_emb = get_rope(
             head_size=self.num_heads,
@@ -191,8 +193,7 @@ class YiDecoderLayer(nn.Module):
         # Requires transformers > 4.32.0
         rope_theta = getattr(config, "rope_theta", 10000)
         rope_scaling = getattr(config, "rope_scaling", None)
-        max_position_embeddings = getattr(config, "max_position_embeddings",
-                                          8192)
+        max_position_embeddings = getattr(config, "max_position_embeddings", 8192)
         self.self_attn = YiAttention(
             hidden_size=self.hidden_size,
             num_heads=config.num_attention_heads,
@@ -253,11 +254,14 @@ class YiModel(nn.Module):
                 linear_metric_name=OperationMetrics.EMBED_LINEAR,
                 communication_metric_name=OperationMetrics.EMBED_ALL_REDUCE,
             )
-        self.layers = nn.ModuleList([
-            YiDecoderLayer(config)
-            for _ in range(config.num_hidden_layers //
-                           get_pipeline_model_parallel_world_size())
-        ])
+        self.layers = nn.ModuleList(
+            [
+                YiDecoderLayer(config)
+                for _ in range(
+                    config.num_hidden_layers // get_pipeline_model_parallel_world_size()
+                )
+            ]
+        )
         self.norm = None
         if is_pipeline_last_stage():
             self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
@@ -299,10 +303,9 @@ class YiForCausalLM(nn.Module):
 
         self.lm_head = None
         if self.is_pipeline_last_stage:
-            self.lm_head = ColumnParallelLinear(config.hidden_size,
-                                                vocab_size,
-                                                bias=False,
-                                                gather_output=False)
+            self.lm_head = ColumnParallelLinear(
+                config.hidden_size, vocab_size, bias=False, gather_output=False
+            )
 
     def forward(
         self,
@@ -329,11 +332,13 @@ class YiForCausalLM(nn.Module):
     _column_parallel_layers = []
     _row_parallel_layers = ["o_proj", "down_proj"]
 
-    def load_weights(self,
-                     model_name_or_path: str,
-                     cache_dir: Optional[str] = None,
-                     load_format: str = "auto",
-                     revision: Optional[str] = None):
+    def load_weights(
+        self,
+        model_name_or_path: str,
+        cache_dir: Optional[str] = None,
+        load_format: str = "auto",
+        revision: Optional[str] = None,
+    ):
 
         weight_suffixes = ["weight"]
         weight_suffixes = ["weight"]
@@ -358,34 +363,34 @@ class YiForCausalLM(nn.Module):
         first_layer_id = layers_per_stage * pp_rank
         last_layer_id = layers_per_stage * (pp_rank + 1) - 1
 
-        q_proj_shard_size = (self.config.hidden_size // tp_size)
-        num_kv_heads_replicas = max(1,
-                                    tp_size // self.config.num_key_value_heads)
-        num_kv_heads_per_gpu = max(1,
-                                   self.config.num_key_value_heads // tp_size)
-        kv_proj_shard_size = (self.config.hidden_size //
-                              self.config.num_attention_heads *
-                              num_kv_heads_per_gpu)
+        q_proj_shard_size = self.config.hidden_size // tp_size
+        num_kv_heads_replicas = max(1, tp_size // self.config.num_key_value_heads)
+        num_kv_heads_per_gpu = max(1, self.config.num_key_value_heads // tp_size)
+        kv_proj_shard_size = (
+            self.config.hidden_size
+            // self.config.num_attention_heads
+            * num_kv_heads_per_gpu
+        )
         attention_weight_specs = [
             # (weight_name, shard_size, offset)
             ("q_proj", q_proj_shard_size, 0),
             ("k_proj", kv_proj_shard_size, q_proj_shard_size),
-            ("v_proj", kv_proj_shard_size,
-             q_proj_shard_size + kv_proj_shard_size),
+            ("v_proj", kv_proj_shard_size, q_proj_shard_size + kv_proj_shard_size),
         ]
         state_dict = self.state_dict()
 
         for name, loaded_weight in hf_model_weights_iterator(
-                model_name_or_path, cache_dir, load_format, revision):
+            model_name_or_path, cache_dir, load_format, revision
+        ):
             if "rotary_emb.inv_freq" in name:
                 continue
 
-            if pp_rank != 0 \
-                    and "embed_tokens" in name:
+            if pp_rank != 0 and "embed_tokens" in name:
                 continue
 
-            if pp_rank != pp_size - 1 \
-                    and ("lm_head" in name or name == "model.norm.weight"):
+            if pp_rank != pp_size - 1 and (
+                "lm_head" in name or name == "model.norm.weight"
+            ):
                 continue
 
             if "model.layers" in name:
@@ -405,10 +410,10 @@ class YiForCausalLM(nn.Module):
                     shard_id = tp_rank // num_kv_heads_replicas
                 else:
                     shard_id = tp_rank
-                loaded_weight = loaded_weight[shard_size *
-                                              shard_id:shard_size *
-                                              (shard_id + 1)]
-                param_slice = param.data[offset:offset + shard_size]
+                loaded_weight = loaded_weight[
+                    shard_size * shard_id : shard_size * (shard_id + 1)
+                ]
+                param_slice = param.data[offset : offset + shard_size]
                 assert param_slice.shape == loaded_weight.shape
 
                 param_slice.copy_(loaded_weight)
@@ -424,10 +429,12 @@ class YiForCausalLM(nn.Module):
                 param = state_dict[name.replace(weight_name, "gate_up_proj")]
 
                 shard_size = param.shape[0] // 2
-                loaded_weight = loaded_weight[shard_size * tp_rank:shard_size *
-                                              (tp_rank + 1)]
-                param_slice = param.data[shard_size * stride_id:shard_size *
-                                         (stride_id + 1)]
+                loaded_weight = loaded_weight[
+                    shard_size * tp_rank : shard_size * (tp_rank + 1)
+                ]
+                param_slice = param.data[
+                    shard_size * stride_id : shard_size * (stride_id + 1)
+                ]
                 assert param_slice.shape == loaded_weight.shape
                 param_slice.copy_(loaded_weight)
                 is_gate_up_weight = True
@@ -438,10 +445,14 @@ class YiForCausalLM(nn.Module):
             param = state_dict[name]
 
             if "embed_tokens" in name or "lm_head" in name:
-                load_padded_tensor_parallel_vocab(param, loaded_weight,
-                                                  tp_rank)
+                load_padded_tensor_parallel_vocab(param, loaded_weight, tp_rank)
                 continue
 
-            load_tensor_parallel_weights(param, loaded_weight, name,
-                                         column_parallel_weights,
-                                         row_parallel_weights, tp_rank)
+            load_tensor_parallel_weights(
+                param,
+                loaded_weight,
+                name,
+                column_parallel_weights,
+                row_parallel_weights,
+                tp_rank,
+            )

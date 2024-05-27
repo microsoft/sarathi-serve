@@ -1,17 +1,22 @@
 import time
-from threading import Thread, Event
-from typing import List
-from queue import Queue
 from dataclasses import dataclass
+from queue import Queue
+from threading import Event, Thread
+from typing import List
 
-from sarathi.config import (CacheConfig, MetricsConfig, ModelConfig,
-                            ParallelConfig, BaseSchedulerConfig)
-from sarathi.logger import init_logger
+from sarathi.config import (
+    BaseSchedulerConfig,
+    CacheConfig,
+    MetricsConfig,
+    ModelConfig,
+    ParallelConfig,
+)
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SequenceMetadata
-from sarathi.utils.threading_utils import exit_on_error
 from sarathi.engine.base_llm_engine import BaseLLMEngine
+from sarathi.logger import init_logger
+from sarathi.utils.threading_utils import exit_on_error
 
 logger = init_logger(__name__)
 
@@ -56,8 +61,13 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         scheduler_config: BaseSchedulerConfig,
         metrics_config: MetricsConfig,
     ) -> None:
-        super().__init__(model_config, cache_config, parallel_config,
-                         scheduler_config, metrics_config)
+        super().__init__(
+            model_config,
+            cache_config,
+            parallel_config,
+            scheduler_config,
+            metrics_config,
+        )
         # Create the request queue.
         self.has_started_execution_loops = False
         self.scheduler_output_queue = Queue()
@@ -66,10 +76,12 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         self.microbatch_watch_event = Event()
         self.schedule_thread = Thread(target=self._schedule_loop, daemon=True)
         self.microbatch_watch_thread = Thread(
-            target=self._microbatch_watch_loop, daemon=True)
+            target=self._microbatch_watch_loop, daemon=True
+        )
         self.output_thread = Thread(target=self._output_loop, daemon=True)
-        self.scheduler_timer_thread = Thread(target=self._scheduler_timer_loop,
-                                             daemon=True)
+        self.scheduler_timer_thread = Thread(
+            target=self._scheduler_timer_loop, daemon=True
+        )
 
     def _validate_parallel_config(self) -> None:
         assert self.parallel_config.pipeline_parallel_size > 1
@@ -93,6 +105,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         # Lazy import the Worker to avoid importing torch.cuda/xformers
         # before CUDA_VISIBLE_DEVICES is set in the Worker
         from sarathi.worker.pipeline_parallel_worker import PipelineParallelWorker
+
         return PipelineParallelWorker
 
     @exit_on_error
@@ -109,7 +122,8 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
                 continue
 
             ignored_seqs, seq_metadata_list = self.seq_manager.on_schedule(
-                scheduler_outputs)
+                scheduler_outputs
+            )
 
             self.scheduler_output_queue.put(
                 ScheduleStageOutputs(
@@ -117,7 +131,8 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
                     seq_metadata_list,
                     scheduler_outputs,
                     start_time,
-                ))
+                )
+            )
 
             if not scheduler_outputs.is_empty():
                 self.microbatch_watch_event.set()
@@ -128,8 +143,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
                 )
 
             end_time = time.perf_counter()
-            self.metrics_store.on_schedule(seq_metadata_list, start_time,
-                                           end_time)
+            self.metrics_store.on_schedule(seq_metadata_list, start_time, end_time)
 
     @exit_on_error
     def _microbatch_watch_loop(self) -> None:
@@ -149,8 +163,10 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
             scheduler_stage_output = self.scheduler_output_queue.get()
 
             sampler_outputs = self._run_worker(
-                (0, self.parallel_config.pipeline_parallel_size -
-                 1),  # TP rank zero for last pipeline stage
+                (
+                    0,
+                    self.parallel_config.pipeline_parallel_size - 1,
+                ),  # TP rank zero for last pipeline stage
                 "get_output",
             )
 
@@ -164,8 +180,10 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
             all_request_outputs = self._on_step_completed(
                 scheduler_stage_output.scheduler_outputs,
                 scheduler_stage_output.ignored_seqs,
-                scheduler_stage_output.seq_metadata_list, sampler_outputs,
-                scheduler_stage_output.start_time)
+                scheduler_stage_output.seq_metadata_list,
+                sampler_outputs,
+                scheduler_stage_output.start_time,
+            )
             self.schedule_event.set()
             self.output_queue.put(all_request_outputs)
 

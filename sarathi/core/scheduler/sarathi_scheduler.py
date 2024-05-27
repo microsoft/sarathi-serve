@@ -4,11 +4,13 @@ from typing import List
 import numpy as np
 
 from sarathi.config import CacheConfig, SarathiSchedulerConfig
-from sarathi.logger import init_logger
+from sarathi.core.block_space_manager.sarathi_block_space_manager import (
+    SarathiBlockSpaceManager,
+)
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import Sequence, SequenceScheduleMetadata
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.block_space_manager.sarathi_block_space_manager import SarathiBlockSpaceManager
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -24,7 +26,9 @@ class SarathiScheduler(BaseScheduler):
 
         self.prompt_limit = self.scheduler_config.max_model_len
         self.chunk_size = self.scheduler_config.chunk_size
-        self.enable_dynamic_chunking_schedule = self.scheduler_config.enable_dynamic_chunking_schedule
+        self.enable_dynamic_chunking_schedule = (
+            self.scheduler_config.enable_dynamic_chunking_schedule
+        )
         # next four params apply only when using dynamic schedule
         self.low_chunk_size = self.scheduler_config.low_chunk_size
         self.high_chunk_size = self.scheduler_config.high_chunk_size
@@ -38,19 +42,22 @@ class SarathiScheduler(BaseScheduler):
             assert self.high_chunk_size % 32 == 0
             self._chunk_sizes = self._compute_chunk_size_schedule()
             self._tokens_per_stage = int(
-                np.ceil(self.chunk_schedule_max_tokens /
-                        self.chunk_schedule_stages))
+                np.ceil(self.chunk_schedule_max_tokens / self.chunk_schedule_stages)
+            )
 
     def _compute_chunk_size_schedule(self):
         # create num_steps equally spaced chunk sizes between low_chunk_size and high_chunk_size
-        chunk_sizes = np.linspace(self.low_chunk_size,
-                                  self.high_chunk_size,
-                                  self.chunk_schedule_stages,
-                                  dtype=np.int32)[::-1]
+        chunk_sizes = np.linspace(
+            self.low_chunk_size,
+            self.high_chunk_size,
+            self.chunk_schedule_stages,
+            dtype=np.int32,
+        )[::-1]
         # align each chunk size to the nearest multiple of 32 or self.low_chunk_size
         round_of_chunk_sizes = min(32, self.low_chunk_size)
-        chunk_sizes = np.round(
-            chunk_sizes / round_of_chunk_sizes) * round_of_chunk_sizes
+        chunk_sizes = (
+            np.round(chunk_sizes / round_of_chunk_sizes) * round_of_chunk_sizes
+        )
         chunk_sizes = chunk_sizes.astype(np.int64).tolist()
 
         return chunk_sizes
@@ -58,14 +65,15 @@ class SarathiScheduler(BaseScheduler):
     def get_block_space_manager_class(self):
         return SarathiBlockSpaceManager
 
-    def _get_seq_next_num_prefill_tokens(self, seq: Sequence,
-                                         num_batched_tokens: int) -> int:
+    def _get_seq_next_num_prefill_tokens(
+        self, seq: Sequence, num_batched_tokens: int
+    ) -> int:
         assert not seq.is_finished()
 
         if self.enable_dynamic_chunking_schedule:
             request_stage_idx = int(
-                np.ceil(seq.get_num_prompt_tokens_processed() //
-                        self._tokens_per_stage))
+                np.ceil(seq.get_num_prompt_tokens_processed() // self._tokens_per_stage)
+            )
             assert request_stage_idx < len(self._chunk_sizes)
             chunk_size = self._chunk_sizes[request_stage_idx]
         else:
@@ -73,7 +81,8 @@ class SarathiScheduler(BaseScheduler):
 
         next_num_tokens = min(
             seq.get_prompt_len() - seq.get_num_prompt_tokens_processed(),
-            chunk_size - num_batched_tokens)
+            chunk_size - num_batched_tokens,
+        )
 
         return next_num_tokens
 
@@ -138,7 +147,8 @@ class SarathiScheduler(BaseScheduler):
                 running.append(seq)
                 num_batched_tokens += 1
                 scheduled_seq_metadata_list.append(
-                    SequenceScheduleMetadata.from_sequence(seq))
+                    SequenceScheduleMetadata.from_sequence(seq)
+                )
 
         # now add the requests with prefill incomplete
         # the memory for all these prefills has already been allocated
@@ -147,7 +157,8 @@ class SarathiScheduler(BaseScheduler):
             assert not seq.prompt_processing_finished
 
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
-                seq, num_batched_tokens)
+                seq, num_batched_tokens
+            )
 
             # as long as the request could fit in the batch previously
             # it should be able to fit in the batch now
@@ -161,7 +172,9 @@ class SarathiScheduler(BaseScheduler):
             num_batched_tokens += next_num_prefill_tokens
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
-                    seq, prompt_chunk_len=next_num_prefill_tokens))
+                    seq, prompt_chunk_len=next_num_prefill_tokens
+                )
+            )
             running.append(seq)
 
         ######################################################################
@@ -196,7 +209,8 @@ class SarathiScheduler(BaseScheduler):
 
             # check if we can fit the prefill in the batch
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
-                seq, num_batched_tokens)
+                seq, num_batched_tokens
+            )
 
             if next_num_prefill_tokens == 0:
                 break
@@ -206,7 +220,9 @@ class SarathiScheduler(BaseScheduler):
             num_batched_tokens += next_num_prefill_tokens
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
-                    seq, prompt_chunk_len=next_num_prefill_tokens))
+                    seq, prompt_chunk_len=next_num_prefill_tokens
+                )
+            )
             running.append(seq)
 
         # make sure that prefills are at the start of the batch, so that we don't violate assumptions

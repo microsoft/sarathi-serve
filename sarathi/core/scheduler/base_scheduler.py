@@ -2,14 +2,15 @@ import time
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
-from sarathi.config import CacheConfig, BaseSchedulerConfig
+from sarathi.config import BaseSchedulerConfig, CacheConfig
+from sarathi.core.block_space_manager.block_space_manager_registry import (
+    BlockSpaceManagerRegistry,
+)
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
+from sarathi.core.datatypes.sequence import Sequence, SequenceStatus
 from sarathi.core.policy import PolicyFactory
 from sarathi.logger import init_logger
-from sarathi.core.datatypes.sequence import Sequence
-from sarathi.core.datatypes.sequence import SequenceStatus
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.metrics.metrics_store import MetricsStore
-from sarathi.core.block_space_manager.block_space_manager_registry import BlockSpaceManagerRegistry
 
 logger = init_logger(__name__)
 
@@ -123,7 +124,8 @@ class BaseScheduler(ABC):
         if seq.get_len() > self.scheduler_config.max_model_len:
             logger.warning(
                 f"Input prompt ({seq.get_len()} tokens) is too long"
-                f" and exceeds limit of {seq.sampling_params.max_tokens}")
+                f" and exceeds limit of {seq.sampling_params.max_tokens}"
+            )
             seq.set_status(SequenceStatus.FINISHED_IGNORED)
             self.waiting.pop(0)
             return False
