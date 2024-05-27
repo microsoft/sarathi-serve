@@ -1,14 +1,15 @@
 import os
 import traceback
-from threading import Lock
 from functools import wraps
+from threading import Lock
 
 
 def synchronized(method):
-    """ Synchronization decorator at the instance level. """
+    """Synchronization decorator at the instance level."""
 
     @wraps(method)
     def synced_method(self, *args, **kwargs):
+        # pylint: disable=protected-access
         if not hasattr(self, "_lock"):
             self._lock = Lock()
 
@@ -24,8 +25,8 @@ def exit_on_error(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             traceback.print_exc()
-            os._exit(1)
+            os._exit(1)  # pylint: disable=protected-access
 
     return wrapper

@@ -2,16 +2,16 @@ from typing import List, Optional
 
 import torch
 from flashinfer import (
-    single_prefill_with_kv_cache,
-    append_paged_kv_cache,
     BatchDecodeWithPagedKVCacheWrapper,
+    append_paged_kv_cache,
+    single_prefill_with_kv_cache,
 )
 
 from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
+from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 from sarathi.model_executor.attention.kv_buffer import KVBuffer
-from sarathi.metrics.constants import OperationMetrics
 
 
 class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
@@ -26,11 +26,10 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
     ):
         super().init(model_config, parallel_config, block_size, device)
 
-        workspace_buffer = torch.empty(16 * 1024 * 1024,
-                                       dtype=torch.uint8,
-                                       device=device)
-        self._wrapper = BatchDecodeWithPagedKVCacheWrapper(
-            workspace_buffer, "NHD")
+        workspace_buffer = torch.empty(
+            16 * 1024 * 1024, dtype=torch.uint8, device=device
+        )
+        self._wrapper = BatchDecodeWithPagedKVCacheWrapper(workspace_buffer, "NHD")
 
         self.kv_buffers: List[KVBuffer] = []
         num_layers = model_config.get_num_layers(parallel_config)
@@ -41,7 +40,7 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
                     self.num_kv_heads,
                     self.head_dim,
                     device,
-                    self.dtype
+                    self.dtype,
                 )
             )
 
@@ -93,7 +92,7 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
         # in the ragged tensor.
         kv_page_indptr: List[int] = [0]
         decode_kv_page_indptr: List[int] = [0]
-        # we also create a qo_indptr tensor to capture the start of each sequence in the 
+        # we also create a qo_indptr tensor to capture the start of each sequence in the
         # ragged tensor which is used for the kv cache append api.
         # qo_indptr: [0, prompt_0, prompt_0 + prompt_1, ..., prompt_0 + ... + prompt_N-1, generation_0, generation_0 + 1, ..., generation_0 + ... + M]
         qo_indptr: List[int] = [0]
@@ -130,13 +129,14 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
             # indptr for the prompt tokens in q/o tensor
             qo_indptr.append(qo_indptr[-1] + prompt_chunk_len)
             # Compute the kv page indices for the prompt tokens.
-            num_blocks_in_use = (current_total_len + self.block_size -
-                                 1) // self.block_size
-            kv_page_indices.extend(
-                seq_metadata.block_table[:num_blocks_in_use])
+            num_blocks_in_use = (
+                current_total_len + self.block_size - 1
+            ) // self.block_size
+            kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
             kv_page_indptr.append(kv_page_indptr[-1] + num_blocks_in_use)
-            kv_last_page_len.append(current_total_len % self.block_size
-                                    or self.block_size)
+            kv_last_page_len.append(
+                current_total_len % self.block_size or self.block_size
+            )
 
         for seq_metadata in seq_metadata_list:
             if seq_metadata.block_table is None:
@@ -154,37 +154,35 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
             # Compute the kv page indices for the prompt tokens.
             kv_page_indices.extend(seq_metadata.block_table)
             decode_kv_page_indices.extend(seq_metadata.block_table)
-            kv_page_indptr.append(kv_page_indptr[-1] +
-                                  len(seq_metadata.block_table))
-            decode_kv_page_indptr.append(decode_kv_page_indptr[-1] +
-                                            len(seq_metadata.block_table))
-            kv_last_page_len.append(context_len % self.block_size
-                                    or self.block_size)
-            decode_kv_last_page_len.append(context_len % self.block_size
-                                    or self.block_size)
+            kv_page_indptr.append(kv_page_indptr[-1] + len(seq_metadata.block_table))
+            decode_kv_page_indptr.append(
+                decode_kv_page_indptr[-1] + len(seq_metadata.block_table)
+            )
+            kv_last_page_len.append(context_len % self.block_size or self.block_size)
+            decode_kv_last_page_len.append(
+                context_len % self.block_size or self.block_size
+            )
 
         # Convert to tensors.
-        self.qo_indptr = torch.tensor(qo_indptr,
-                                      dtype=torch.int32,
-                                      device=self.device)
-        self.kv_page_indices = torch.tensor(kv_page_indices,
-                                            dtype=torch.int32,
-                                            device=self.device)
-        self.kv_page_indptr = torch.tensor(kv_page_indptr,
-                                           dtype=torch.int32,
-                                           device=self.device)
-        self.kv_last_page_len = torch.tensor(kv_last_page_len,
-                                             dtype=torch.int32,
-                                             device=self.device)
-        decode_kv_page_indices = torch.tensor(decode_kv_page_indices,
-                                              dtype=torch.int32,
-                                              device=self.device)
-        decode_kv_page_indptr = torch.tensor(decode_kv_page_indptr,
-                                             dtype=torch.int32,
-                                             device=self.device)
-        decode_kv_last_page_len = torch.tensor(decode_kv_last_page_len,
-                                               dtype=torch.int32,
-                                               device=self.device)
+        self.qo_indptr = torch.tensor(qo_indptr, dtype=torch.int32, device=self.device)
+        self.kv_page_indices = torch.tensor(
+            kv_page_indices, dtype=torch.int32, device=self.device
+        )
+        self.kv_page_indptr = torch.tensor(
+            kv_page_indptr, dtype=torch.int32, device=self.device
+        )
+        self.kv_last_page_len = torch.tensor(
+            kv_last_page_len, dtype=torch.int32, device=self.device
+        )
+        decode_kv_page_indices = torch.tensor(
+            decode_kv_page_indices, dtype=torch.int32, device=self.device
+        )
+        decode_kv_page_indptr = torch.tensor(
+            decode_kv_page_indptr, dtype=torch.int32, device=self.device
+        )
+        decode_kv_last_page_len = torch.tensor(
+            decode_kv_last_page_len, dtype=torch.int32, device=self.device
+        )
 
         self.prompt_seq_ids = prompt_seq_ids
         self.prompt_chunk_lens = prompt_chunk_lens
@@ -222,15 +220,12 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
             # there is no need to call attention in profiling mode
             return torch.zeros_like(query)
 
-        output = torch.empty_like(query).view(-1, self.num_q_heads,self.head_dim)
+        output = torch.empty_like(query).view(-1, self.num_q_heads, self.head_dim)
 
         with self.get_timer(OperationMetrics.ATTN_INPUT_RESHAPE, layer_id):
-            query = query.contiguous().reshape(-1, self.num_q_heads,
-                                               self.head_dim)
-            key = key.contiguous().reshape(-1, self.num_kv_heads,
-                                           self.head_dim)
-            value = value.contiguous().reshape(-1, self.num_kv_heads,
-                                               self.head_dim)
+            query = query.contiguous().reshape(-1, self.num_q_heads, self.head_dim)
+            key = key.contiguous().reshape(-1, self.num_kv_heads, self.head_dim)
+            value = value.contiguous().reshape(-1, self.num_kv_heads, self.head_dim)
 
         qo_offset: int = 0
         for i, seq_id in enumerate(self.prompt_seq_ids):
@@ -240,15 +235,22 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
             processed_prompt_len = self.processed_prompt_lens[i]
             total_prompt_len = self.total_prompt_lens[i]
 
-            q = query[qo_offset:qo_offset+prompt_chunk_len]
-            k = key[qo_offset:qo_offset+prompt_chunk_len]
-            v = value[qo_offset:qo_offset+prompt_chunk_len]
+            q = query[qo_offset : qo_offset + prompt_chunk_len]
+            k = key[qo_offset : qo_offset + prompt_chunk_len]
+            v = value[qo_offset : qo_offset + prompt_chunk_len]
 
             if prompt_chunk_len == total_prompt_len:
                 # if all the tokens are processed at once, we can skip the kv buffer management
                 with self.get_timer(OperationMetrics.ATTN, layer_id):
-                    output[qo_offset:qo_offset+prompt_chunk_len] = single_prefill_with_kv_cache(
-                        q, k, v, causal=True, pos_encoding_mode="NONE", sm_scale=softmax_scale
+                    output[qo_offset : qo_offset + prompt_chunk_len] = (
+                        single_prefill_with_kv_cache(
+                            q,
+                            k,
+                            v,
+                            causal=True,
+                            pos_encoding_mode="NONE",
+                            sm_scale=softmax_scale,
+                        )
                     )
             else:
                 if seq_id not in kv_buffer.buffer_indices:
@@ -257,11 +259,18 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
                 kv_buffer.append(seq_id, k, v)
                 k_, v_ = kv_buffer.get_kv_tensors(seq_id)
                 with self.get_timer(OperationMetrics.ATTN, layer_id):
-                    output[qo_offset:qo_offset+prompt_chunk_len] = single_prefill_with_kv_cache(
-                        q, k_, v_, causal=True, pos_encoding_mode="NONE", sm_scale=softmax_scale
+                    output[qo_offset : qo_offset + prompt_chunk_len] = (
+                        single_prefill_with_kv_cache(
+                            q,
+                            k_,
+                            v_,
+                            causal=True,
+                            pos_encoding_mode="NONE",
+                            sm_scale=softmax_scale,
+                        )
                     )
 
-                if total_prompt_len == processed_prompt_len + prompt_chunk_len: 
+                if total_prompt_len == processed_prompt_len + prompt_chunk_len:
                     kv_buffer.free_request(seq_id)
 
             qo_offset += prompt_chunk_len
@@ -278,20 +287,20 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
                 kv_layout="NHD",
             )
 
-
         if self.decode_batch_size > 0:
             with self.get_timer(OperationMetrics.ATTN, layer_id):
-                output[qo_offset:qo_offset+self.decode_batch_size] = self._wrapper.forward(
-                    query[qo_offset:qo_offset+self.decode_batch_size],
-                    kv_cache,
-                    pos_encoding_mode="NONE",
-                    sm_scale=softmax_scale,
+                output[qo_offset : qo_offset + self.decode_batch_size] = (
+                    self._wrapper.forward(
+                        query[qo_offset : qo_offset + self.decode_batch_size],
+                        kv_cache,
+                        pos_encoding_mode="NONE",
+                        sm_scale=softmax_scale,
+                    )
                 )
                 qo_offset += self.decode_batch_size
 
         with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):
-            output = output.reshape(-1,
-                                    self.num_q_heads * self.head_dim)
+            output = output.reshape(-1, self.num_q_heads * self.head_dim)
 
         self.layer_index += 1
         assert self.layer_index <= len(self.kv_buffers)

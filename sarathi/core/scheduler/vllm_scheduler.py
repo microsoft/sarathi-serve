@@ -2,11 +2,13 @@ import time
 from typing import List
 
 from sarathi.config import CacheConfig, VLLMSchedulerConfig
-from sarathi.logger import init_logger
+from sarathi.core.block_space_manager.vllm_block_space_manager import (
+    VLLMBlockSpaceManager,
+)
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import Sequence, SequenceScheduleMetadata
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.block_space_manager.vllm_block_space_manager import VLLMBlockSpaceManager
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -20,8 +22,10 @@ class VLLMScheduler(BaseScheduler):
     ) -> None:
         super().__init__(scheduler_config, cache_config)
 
-        self.prompt_limit = min(self.scheduler_config.max_model_len,
-                                self.scheduler_config.max_num_batched_tokens)
+        self.prompt_limit = min(
+            self.scheduler_config.max_model_len,
+            self.scheduler_config.max_num_batched_tokens,
+        )
 
     def get_block_space_manager_class(self):
         return VLLMBlockSpaceManager
@@ -57,8 +61,10 @@ class VLLMScheduler(BaseScheduler):
                 break
 
             # If the number of batched tokens exceeds the limit, stop.
-            if (num_batched_tokens + num_prompt_tokens
-                    > self.scheduler_config.max_num_batched_tokens):
+            if (
+                num_batched_tokens + num_prompt_tokens
+                > self.scheduler_config.max_num_batched_tokens
+            ):
                 break
 
             if len(self.running) + 1 > self.scheduler_config.max_num_seqs:
@@ -68,7 +74,8 @@ class VLLMScheduler(BaseScheduler):
             self._allocate(seq)
             num_batched_tokens += num_prompt_tokens
             scheduled_seq_metadata_list.append(
-                SequenceScheduleMetadata.from_sequence(seq))
+                SequenceScheduleMetadata.from_sequence(seq)
+            )
             self.running.append(seq)
 
         if scheduled_seq_metadata_list or ignored_seq_ids:
@@ -115,7 +122,8 @@ class VLLMScheduler(BaseScheduler):
                 self._append_slot(seq)
                 running.append(seq)
                 scheduled_seq_metadata_list.append(
-                    SequenceScheduleMetadata.from_sequence(seq))
+                    SequenceScheduleMetadata.from_sequence(seq)
+                )
 
         self.running = running
 

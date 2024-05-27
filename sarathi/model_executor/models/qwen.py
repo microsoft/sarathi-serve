@@ -14,34 +14,31 @@ from torch import nn
 
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
+from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.activation import SiluAndMul
 from sarathi.model_executor.layers.layernorm import RMSNorm
+from sarathi.model_executor.layers.rotary_embedding import get_rope
+from sarathi.model_executor.parallel_utils.parallel_state import (
+    get_pipeline_model_parallel_rank,
+    get_pipeline_model_parallel_world_size,
+    get_tensor_model_parallel_rank,
+    get_tensor_model_parallel_world_size,
+    is_pipeline_first_stage,
+    is_pipeline_last_stage,
+)
+from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import recv, send
+from sarathi.model_executor.parallel_utils.tensor_parallel import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+    VocabParallelEmbedding,
+)
 from sarathi.model_executor.weight_utils import (
     convert_pyslice_to_tensor,
     hf_model_weights_iterator,
     load_padded_tensor_parallel_vocab,
     load_tensor_parallel_weights,
 )
-from sarathi.model_executor.parallel_utils.parallel_state import (
-    get_tensor_model_parallel_rank,
-    get_tensor_model_parallel_world_size,
-    get_pipeline_model_parallel_rank,
-    get_pipeline_model_parallel_world_size,
-    is_pipeline_first_stage,
-    is_pipeline_last_stage,
-)
-from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import (
-    send,
-    recv,
-)
-from sarathi.model_executor.parallel_utils.tensor_parallel import (
-    VocabParallelEmbedding,
-    ColumnParallelLinear,
-    RowParallelLinear,
-)
 from sarathi.transformers_utils.configs.qwen import QWenConfig
-from sarathi.model_executor.layers.rotary_embedding import get_rope
-from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.worker.cache_engine import KVCache
 
 
@@ -70,12 +67,13 @@ class QWenMLP(nn.Module):
             input_is_parallel=True,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.
-            MLP_DOWN_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE,
         )
         if hidden_act != "silu":
-            raise ValueError(f"Unsupported activation: {hidden_act}. "
-                             "Only silu is supported for now.")
+            raise ValueError(
+                f"Unsupported activation: {hidden_act}. "
+                "Only silu is supported for now."
+            )
         self.act_fn = SiluAndMul()
         self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION)
 
@@ -99,12 +97,10 @@ class QWenAttention(nn.Module):
     ):
         super().__init__()
         self.hidden_size = hidden_size
-        tensor_model_parallel_world_size = get_tensor_model_parallel_world_size(
-        )
+        tensor_model_parallel_world_size = get_tensor_model_parallel_world_size()
         self.total_num_heads = num_heads
         assert self.total_num_heads % tensor_model_parallel_world_size == 0
-        self.num_heads = (self.total_num_heads //
-                          tensor_model_parallel_world_size)
+        self.num_heads = self.total_num_heads // tensor_model_parallel_world_size
         self.head_dim = hidden_size // self.total_num_heads
 
         # pylint: disable=invalid-name
@@ -115,8 +111,7 @@ class QWenAttention(nn.Module):
             gather_output=False,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.ATTN_PRE_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_PRE_PROJ_ALL_GATHER,
+            communication_metric_name=OperationMetrics.ATTN_PRE_PROJ_ALL_GATHER,
         )
         self.c_proj = RowParallelLinear(
             self.total_num_heads * self.head_dim,
@@ -125,8 +120,7 @@ class QWenAttention(nn.Module):
             input_is_parallel=True,
             perform_initialization=False,
             linear_metric_name=OperationMetrics.ATTN_POST_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_POST_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.ATTN_POST_PROJ_ALL_REDUCE,
         )
         self.scaling = self.head_dim**-0.5
 
@@ -222,18 +216,20 @@ class QWenModel(nn.Module):
 
         if is_pipeline_first_stage():
             vocab_size = ((config.vocab_size + 63) // 64) * 64
-            self.wte = VocabParallelEmbedding(vocab_size,
-                                              config.hidden_size,
-                                              perform_initialization=False)
-        self.h = nn.ModuleList([
-            QWenBlock(config)
-            for _ in range(config.num_hidden_layers //
-                           get_pipeline_model_parallel_world_size())
-        ])
+            self.wte = VocabParallelEmbedding(
+                vocab_size, config.hidden_size, perform_initialization=False
+            )
+        self.h = nn.ModuleList(
+            [
+                QWenBlock(config)
+                for _ in range(
+                    config.num_hidden_layers // get_pipeline_model_parallel_world_size()
+                )
+            ]
+        )
         self.ln_f = None
         if is_pipeline_last_stage():
-            self.ln_f = RMSNorm(config.hidden_size,
-                                eps=config.layer_norm_epsilon)
+            self.ln_f = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
 
     def forward(
         self,
@@ -323,15 +319,15 @@ class QWenLMHeadModel(nn.Module):
         last_layer_id = layers_per_stage * (pp_rank + 1) - 1
 
         for name, loaded_weight in hf_model_weights_iterator(
-                model_name_or_path, cache_dir, load_format, revision):
+            model_name_or_path, cache_dir, load_format, revision
+        ):
             if "rotary_emb.inv_freq" in name:
                 continue
 
             if pp_rank != 0 and "wte" in name:
                 continue
 
-            if pp_rank != pp_world_size - 1 \
-               and ("lm_head" in name or "ln_f" in name):
+            if pp_rank != pp_world_size - 1 and ("lm_head" in name or "ln_f" in name):
                 continue
 
             loaded_weight = convert_pyslice_to_tensor(loaded_weight)
@@ -353,13 +349,13 @@ class QWenLMHeadModel(nn.Module):
                 head_end = (tp_rank + 1) * num_heads
 
                 if "weight" in name:
-                    loaded_weight = loaded_weight.view(3, total_num_heads,
-                                                       head_size, hidden_size)
+                    loaded_weight = loaded_weight.view(
+                        3, total_num_heads, head_size, hidden_size
+                    )
                     loaded_weight = loaded_weight[:, head_start:head_end, :, :]
                     loaded_weight = loaded_weight.reshape(-1, hidden_size)
                 elif "bias" in name:
-                    loaded_weight = loaded_weight.view(3, total_num_heads,
-                                                       head_size)
+                    loaded_weight = loaded_weight.view(3, total_num_heads, head_size)
                     loaded_weight = loaded_weight[:, head_start:head_end, :]
                     loaded_weight = loaded_weight.reshape(-1)
 
@@ -369,10 +365,12 @@ class QWenLMHeadModel(nn.Module):
                     continue
                 param = state_dict[name.replace(weight_name, "gate_up_proj")]
                 shard_size = param.shape[0] // 2
-                loaded_weight = loaded_weight[shard_size * tp_rank:shard_size *
-                                              (tp_rank + 1)]
-                param_slice = param.data[shard_size * stride_id:shard_size *
-                                         (stride_id + 1)]
+                loaded_weight = loaded_weight[
+                    shard_size * tp_rank : shard_size * (tp_rank + 1)
+                ]
+                param_slice = param.data[
+                    shard_size * stride_id : shard_size * (stride_id + 1)
+                ]
                 assert param_slice.shape == loaded_weight.shape
                 param_slice.copy_(loaded_weight)
                 is_gate_up_weight = True
@@ -383,8 +381,7 @@ class QWenLMHeadModel(nn.Module):
             param = state_dict[name]
 
             if "wte" in name or "lm_head" in name:
-                load_padded_tensor_parallel_vocab(param, loaded_weight,
-                                                  tp_rank)
+                load_padded_tensor_parallel_vocab(param, loaded_weight, tp_rank)
                 continue
 
             load_tensor_parallel_weights(

@@ -37,7 +37,7 @@ class FCFS(Policy):
 class PolicyFactory:
 
     _POLICY_REGISTRY = {
-        'fcfs': FCFS,
+        "fcfs": FCFS,
     }
 
     @classmethod

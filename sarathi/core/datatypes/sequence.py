@@ -1,10 +1,11 @@
 """Sequence and its related classes."""
+
 from typing import List, Optional
 
 from sarathi.core.datatypes.block import LogicalTokenBlock
 from sarathi.core.datatypes.sampling_params import SamplingParams
-from sarathi.core.datatypes.sequence_status import SequenceStatus
 from sarathi.core.datatypes.sequence_state import SequenceState
+from sarathi.core.datatypes.sequence_status import SequenceStatus
 
 
 class Sequence:
@@ -79,8 +80,7 @@ class Sequence:
                 last_block = self.logical_token_blocks[-1]
 
             num_empty_slots = last_block.get_num_empty_slots()
-            last_block.append_tokens(token_ids[cursor:cursor +
-                                               num_empty_slots])
+            last_block.append_tokens(token_ids[cursor : cursor + num_empty_slots])
             cursor += num_empty_slots
 
     def update_prompt_tokens_processed(self, num_tokens: int) -> None:
@@ -136,8 +136,9 @@ class Sequence:
         return self.prompt_token_ids[start:end]
 
     def get_next_prompt_chunk_len(self, chunk_size: int) -> int:
-        return min(chunk_size,
-                   len(self.prompt_token_ids) - self.prompt_tokens_processed)
+        return min(
+            chunk_size, len(self.prompt_token_ids) - self.prompt_tokens_processed
+        )
 
     def is_finished(self) -> bool:
         return SequenceStatus.is_finished(self.get_status())
@@ -167,7 +168,7 @@ class Sequence:
             if self.output_text.endswith(stop_str):
                 # Truncate the output text so that the stop string is
                 # not included in the output.
-                self.output_text = self.output_text[:-len(stop_str)]
+                self.output_text = self.output_text[: -len(stop_str)]
                 self.set_status(SequenceStatus.FINISHED_STOPPED)
                 return
 
@@ -177,15 +178,18 @@ class Sequence:
             return
 
         # Check if the sequence has generated the EOS token.
-        if ((not self.sampling_params.ignore_eos)
-                and self.get_last_token_id() == self.eos_token_id):
+        if (
+            not self.sampling_params.ignore_eos
+        ) and self.get_last_token_id() == self.eos_token_id:
             self.set_status(SequenceStatus.FINISHED_STOPPED)
             return
 
     def __repr__(self) -> str:
-        return (f"Sequence(seq_id={self.seq_id}, "
-                f"status={self.get_status().name}, "
-                f"num_blocks={len(self.logical_token_blocks)})")
+        return (
+            f"Sequence(seq_id={self.seq_id}, "
+            f"status={self.get_status().name}, "
+            f"num_blocks={len(self.logical_token_blocks)})"
+        )
 
 
 class SequenceScheduleMetadata:
@@ -239,8 +243,10 @@ class SequenceScheduleMetadata:
         return cls(seq_id=seq.seq_id, prompt_chunk_len=prompt_chunk_len)
 
     def __str__(self) -> str:
-        return (f"SequenceScheduleMetadata(seq_id={self.seq_id}, "
-                f"prompt_chunk_len={self.prompt_chunk_len})")
+        return (
+            f"SequenceScheduleMetadata(seq_id={self.seq_id}, "
+            f"prompt_chunk_len={self.prompt_chunk_len})"
+        )
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -283,8 +289,10 @@ class SequenceMetadata:
         return max(self.prompt_chunk_len, 1)
 
     def __str__(self) -> str:
-        return (f"SequenceMetadata(seq_id={self.seq.seq_id}, "
-                f"prompt_chunk_len={self.prompt_chunk_len})")
+        return (
+            f"SequenceMetadata(seq_id={self.seq.seq_id}, "
+            f"prompt_chunk_len={self.prompt_chunk_len})"
+        )
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -307,14 +315,15 @@ class SamplerOutput:
         self.output_token = output_token
 
     def __repr__(self) -> str:
-        return (f"SamplerOutput(seq_id={self.seq_id}, "
-                f"output_token={self.output_token}))")
+        return (
+            f"SamplerOutput(seq_id={self.seq_id}, "
+            f"output_token={self.output_token}))"
+        )
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SamplerOutput):
             raise NotImplementedError()
-        return (self.seq_id == other.seq_id
-                and self.output_token == other.output_token)
+        return self.seq_id == other.seq_id and self.output_token == other.output_token
 
 
 SamplerOutputs = List[SamplerOutput]

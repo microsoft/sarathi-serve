@@ -1,15 +1,16 @@
 """Utilities for downloading and initializing model weights."""
-import filelock
+
 import glob
 import json
 import os
 from collections import defaultdict
 from typing import Any, Iterator, List, Optional, Tuple
 
-from huggingface_hub import snapshot_download
-from safetensors.torch import load_file, save_file, safe_open
+import filelock
 import numpy as np
 import torch
+from huggingface_hub import snapshot_download
+from safetensors.torch import load_file, safe_open, save_file
 from tqdm.auto import tqdm
 
 from sarathi.logger import init_logger
@@ -64,10 +65,12 @@ def convert_bin_to_safetensor_file(
     sf_size = os.stat(sf_filename).st_size
     pt_size = os.stat(pt_filename).st_size
     if (sf_size - pt_size) / pt_size > 0.01:
-        raise RuntimeError(f"""The file size different is more than 1%:
+        raise RuntimeError(
+            f"""The file size different is more than 1%:
          - {sf_filename}: {sf_size}
          - {pt_filename}: {pt_size}
-         """)
+         """
+        )
 
     # check if the tensors are the same
     reloaded = load_file(sf_filename)
@@ -96,11 +99,13 @@ def prepare_hf_model_weights(
         # Use file lock to prevent multiple processes from
         # downloading the same model weights at the same time.
         with get_lock(model_name_or_path, cache_dir):
-            hf_folder = snapshot_download(model_name_or_path,
-                                          allow_patterns=allow_patterns,
-                                          cache_dir=cache_dir,
-                                          tqdm_class=Disabledtqdm,
-                                          revision=revision)
+            hf_folder = snapshot_download(
+                model_name_or_path,
+                allow_patterns=allow_patterns,
+                cache_dir=cache_dir,
+                tqdm_class=Disabledtqdm,
+                revision=revision,
+            )
     else:
         hf_folder = model_name_or_path
     hf_weights_files: List[str] = []
@@ -112,15 +117,16 @@ def prepare_hf_model_weights(
         ]
 
     if len(hf_weights_files) == 0 and use_safetensors and fall_back_to_pt:
-        return prepare_hf_model_weights(model_name_or_path,
-                                        cache_dir=cache_dir,
-                                        use_safetensors=False,
-                                        fall_back_to_pt=False,
-                                        revision=revision)
+        return prepare_hf_model_weights(
+            model_name_or_path,
+            cache_dir=cache_dir,
+            use_safetensors=False,
+            fall_back_to_pt=False,
+            revision=revision,
+        )
 
     if len(hf_weights_files) == 0:
-        raise RuntimeError(
-            f"Cannot find any model weights with `{model_name_or_path}`")
+        raise RuntimeError(f"Cannot find any model weights with `{model_name_or_path}`")
 
     return hf_folder, hf_weights_files, use_safetensors
 
@@ -151,7 +157,8 @@ def hf_model_weights_iterator(
         cache_dir=cache_dir,
         use_safetensors=use_safetensors,
         fall_back_to_pt=fall_back_to_pt,
-        revision=revision)
+        revision=revision,
+    )
 
     if use_np_cache:
         # Currently np_cache only support *.bin checkpoints
@@ -225,7 +232,7 @@ def load_padded_tensor_parallel_vocab(
     end_idx = (tensor_model_parallel_rank + 1) * shard_size
     loaded_weight = loaded_weight[start_idx:end_idx]
     loaded_weight = convert_pyslice_to_tensor(loaded_weight)
-    param[:loaded_weight.shape[0]].copy_(loaded_weight)
+    param[: loaded_weight.shape[0]].copy_(loaded_weight)
 
 
 def load_tensor_parallel_weights(
@@ -254,7 +261,8 @@ def load_tensor_parallel_weights(
     loaded_weight = convert_pyslice_to_tensor(loaded_weight)
     assert param.shape == loaded_weight.shape, (
         f"{param_name} shape mismatch between model and checkpoint: "
-        f"{param.shape} != {loaded_weight.shape}")
+        f"{param.shape} != {loaded_weight.shape}"
+    )
     param.data.copy_(loaded_weight)
 
 

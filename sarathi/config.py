@@ -1,5 +1,5 @@
-from typing import Optional, List, Tuple
 from abc import ABC
+from typing import List, Optional, Tuple
 
 import torch
 from transformers import PretrainedConfig
@@ -49,7 +49,7 @@ class ModelConfig:
             a tag name, or a commit id. If unspecified, will use the default
             version.
         max_model_len: Maximum length of a sequence (including prompt and
-            output). If None, will be derived from the model.        
+            output). If None, will be derived from the model.
     """
 
     def __init__(
@@ -85,19 +85,17 @@ class ModelConfig:
 
         self.dtype = _get_and_verify_dtype(self.hf_config, dtype)
         self.hf_config.dtype = self.dtype
-        self.max_model_len = _get_and_verify_max_len(self.hf_config,
-                                                     max_model_len)
+        self.max_model_len = _get_and_verify_max_len(self.hf_config, max_model_len)
         self._verify_load_format()
         self._verify_tokenizer_mode()
 
     def _verify_load_format(self) -> None:
         load_format = self.load_format.lower()
-        if load_format not in [
-                "auto", "pt", "safetensors", "npcache", "dummy"
-        ]:
+        if load_format not in ["auto", "pt", "safetensors", "npcache", "dummy"]:
             raise ValueError(
                 f"Unknown load format: {self.load_format}. Must be one of "
-                "'auto', 'pt', 'safetensors', 'npcache', or 'dummy'.")
+                "'auto', 'pt', 'safetensors', 'npcache', or 'dummy'."
+            )
         self.load_format = load_format
 
     def _verify_tokenizer_mode(self) -> None:
@@ -105,7 +103,8 @@ class ModelConfig:
         if tokenizer_mode not in ["auto", "slow"]:
             raise ValueError(
                 f"Unknown tokenizer mode: {self.tokenizer_mode}. Must be "
-                "either 'auto' or 'slow'.")
+                "either 'auto' or 'slow'."
+            )
         self.tokenizer_mode = tokenizer_mode
 
     def verify_with_parallel_config(
@@ -118,7 +117,8 @@ class ModelConfig:
             raise ValueError(
                 f"Total number of attention heads ({total_num_attention_heads})"
                 " must be divisible by tensor parallel size "
-                f"({tensor_parallel_size}).")
+                f"({tensor_parallel_size})."
+            )
 
         total_num_hidden_layers = self.hf_config.num_hidden_layers
         pipeline_parallel_size = parallel_config.pipeline_parallel_size
@@ -126,7 +126,8 @@ class ModelConfig:
             raise ValueError(
                 f"Total number of hidden layers ({total_num_hidden_layers}) "
                 "must be divisible by pipeline parallel size "
-                f"({pipeline_parallel_size}).")
+                f"({pipeline_parallel_size})."
+            )
 
     def get_hidden_size(self) -> int:
         return self.hf_config.hidden_size
@@ -143,32 +144,35 @@ class ModelConfig:
         falcon_model_types = ["falcon", "RefinedWeb", "RefinedWebModel"]
         new_decoder_arch_falcon = (
             self.hf_config.model_type in falcon_model_types
-            and getattr(self.hf_config, "new_decoder_architecture", False))
-        if not new_decoder_arch_falcon and getattr(self.hf_config,
-                                                   "multi_query", False):
+            and getattr(self.hf_config, "new_decoder_architecture", False)
+        )
+        if not new_decoder_arch_falcon and getattr(
+            self.hf_config, "multi_query", False
+        ):
             # Multi-query attention, only one KV head.
             return 1
         # For Falcon:
         if getattr(self.hf_config, "n_head_kv", None) is not None:
-            return (self.hf_config.n_head_kv //
-                    parallel_config.tensor_parallel_size)
+            return self.hf_config.n_head_kv // parallel_config.tensor_parallel_size
         # For Falcon-40b/Falcon-180b:
         if getattr(self.hf_config, "num_kv_heads", None) is not None:
-            return (self.hf_config.num_kv_heads //
-                    parallel_config.tensor_parallel_size)
+            return self.hf_config.num_kv_heads // parallel_config.tensor_parallel_size
         # For LLaMA-2:
         if getattr(self.hf_config, "num_key_value_heads", None) is not None:
-            return (self.hf_config.num_key_value_heads //
-                    parallel_config.tensor_parallel_size)
+            return (
+                self.hf_config.num_key_value_heads
+                // parallel_config.tensor_parallel_size
+            )
         total_num_attention_heads = self.hf_config.num_attention_heads
         return total_num_attention_heads // parallel_config.tensor_parallel_size
 
     def get_num_q_heads(self, parallel_config: "ParallelConfig") -> int:
         if getattr(self.hf_config, "num_attention_heads", None) is not None:
-            return (self.hf_config.num_attention_heads //
-                    parallel_config.tensor_parallel_size)
-        raise ValueError(
-            "num_attention_heads is not defined in the model config")
+            return (
+                self.hf_config.num_attention_heads
+                // parallel_config.tensor_parallel_size
+            )
+        raise ValueError("num_attention_heads is not defined in the model config")
 
     def get_max_model_len(self) -> int:
         return self.max_model_len
@@ -206,7 +210,8 @@ class CacheConfig:
         if self.gpu_memory_utilization > 1.0:
             raise ValueError(
                 "GPU memory utilization must be less than 1.0. Got "
-                f"{self.gpu_memory_utilization}.")
+                f"{self.gpu_memory_utilization}."
+            )
 
 
 class ParallelConfig:
@@ -228,8 +233,7 @@ class ParallelConfig:
 
         if not replica_resource_mapping:
             replica_resource_mapping = [
-                (None, i)
-                for i in range(pipeline_parallel_size * tensor_parallel_size)
+                (None, i) for i in range(pipeline_parallel_size * tensor_parallel_size)
             ]
 
         self.replica_resource_mapping = replica_resource_mapping
@@ -280,13 +284,17 @@ class VLLMSchedulerConfig(BaseSchedulerConfig):
             moving from WAITING to RUNNING states.
     """
 
-    def __init__(self, max_num_seqs: int, max_model_len: int,
-                 num_pipeline_stages: int,
-                 max_num_batched_tokens: int) -> None:
+    def __init__(
+        self,
+        max_num_seqs: int,
+        max_model_len: int,
+        num_pipeline_stages: int,
+        max_num_batched_tokens: int,
+    ) -> None:
         super().__init__(max_num_seqs, max_model_len, num_pipeline_stages)
-        self._max_num_batched_tokens = (max_num_batched_tokens
-                                        if max_num_batched_tokens else
-                                        max_model_len)
+        self._max_num_batched_tokens = (
+            max_num_batched_tokens if max_num_batched_tokens else max_model_len
+        )
         # Requests with context length upto max_model_len must be schedulable.
         assert max_model_len <= self._max_num_batched_tokens
 
@@ -380,14 +388,23 @@ class SarathiSchedulerConfig(BaseSchedulerConfig):
 class MetricsConfig:
     """Metric configuration."""
 
-    def __init__(self, replica_id: int, write_metrics: bool, output_dir: str,
-                 wandb_project: str, wandb_group: str, wandb_run_name: str,
-                 wandb_sweep_id: str, wandb_run_id: str,
-                 enable_op_level_metrics: bool,
-                 enable_cpu_op_level_metrics: bool, enable_chrome_trace: bool,
-                 enable_request_outputs: bool,
-                 keep_individual_batch_metrics: bool,
-                 model_num_layers: int) -> None:
+    def __init__(
+        self,
+        replica_id: int,
+        write_metrics: bool,
+        output_dir: str,
+        wandb_project: str,
+        wandb_group: str,
+        wandb_run_name: str,
+        wandb_sweep_id: str,
+        wandb_run_id: str,
+        enable_op_level_metrics: bool,
+        enable_cpu_op_level_metrics: bool,
+        enable_chrome_trace: bool,
+        enable_request_outputs: bool,
+        keep_individual_batch_metrics: bool,
+        model_num_layers: int,
+    ) -> None:
         self.replica_id = replica_id
         self.write_metrics = write_metrics
         self.output_dir = output_dir
@@ -416,7 +433,8 @@ class MetricsConfig:
             f"enable_chrome_trace={self.enable_chrome_trace}, "
             f"enable_request_outputs={self.enable_request_outputs}, "
             f"keep_individual_batch_metrics="
-            f"{self.keep_individual_batch_metrics})")
+            f"{self.keep_individual_batch_metrics})"
+        )
 
 
 _STR_DTYPE_TO_TORCH_DTYPE = {
@@ -470,7 +488,8 @@ def _get_and_verify_dtype(
             raise ValueError(
                 "Bfloat16 is only supported on GPUs with compute capability "
                 f"of at least 8.0. Your {gpu_name} GPU has compute capability "
-                f"{compute_capability[0]}.{compute_capability[1]}.")
+                f"{compute_capability[0]}.{compute_capability[1]}."
+            )
     return torch_dtype
 
 
@@ -503,21 +522,22 @@ def _get_and_verify_max_len(
             raise ValueError(
                 "When using rope_scaling, the model's config.json must "
                 "contain one of the following keys to determine the original "
-                f"maximum length of the model: {possible_keys}")
+                f"maximum length of the model: {possible_keys}"
+            )
         assert "factor" in rope_scaling
         scaling_factor = rope_scaling["factor"]
         if rope_scaling["type"] == "yarn":
-            derived_max_model_len = rope_scaling[
-                "original_max_position_embeddings"]
+            derived_max_model_len = rope_scaling["original_max_position_embeddings"]
         derived_max_model_len *= scaling_factor
 
     if max_model_len is None:
-        logger.info(
-            f"Using the derived maximum model length: {derived_max_model_len}")
+        logger.info(f"Using the derived maximum model length: {derived_max_model_len}")
         max_model_len = derived_max_model_len
     elif max_model_len > derived_max_model_len:
-        logger.info(f"Applying rope_scaling to the maximum model length: "
-                    f"{derived_max_model_len} -> {max_model_len}")
+        logger.info(
+            f"Applying rope_scaling to the maximum model length: "
+            f"{derived_max_model_len} -> {max_model_len}"
+        )
         # force rope_scaling
         scaling_factor = max_model_len / derived_max_model_len
         rope_scaling = {"type": "linear", "factor": scaling_factor}

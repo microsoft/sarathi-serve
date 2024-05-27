@@ -1,13 +1,19 @@
 """A layer that samples the next tokens from the model's outputs."""
+
 from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
 
-from sarathi.model_executor.parallel_utils.tensor_parallel import (
-    gather_from_tensor_model_parallel_region)
 from sarathi.core.datatypes.sampling_params import SamplingType
-from sarathi.core.datatypes.sequence import SamplerOutputs, SamplerOutput, SequenceMetadata
+from sarathi.core.datatypes.sequence import (
+    SamplerOutput,
+    SamplerOutputs,
+    SequenceMetadata,
+)
+from sarathi.model_executor.parallel_utils.tensor_parallel import (
+    gather_from_tensor_model_parallel_region,
+)
 
 _SAMPLING_EPS = 1e-5
 
@@ -47,9 +53,7 @@ class Sampler(nn.Module):
         temperatures = _get_temperatures(seq_metadata_list)
         assert len(temperatures) == logits.shape[0]
         if any(t != 1.0 for t in temperatures):
-            t = torch.tensor(temperatures,
-                             dtype=logits.dtype,
-                             device=logits.device)
+            t = torch.tensor(temperatures, dtype=logits.dtype, device=logits.device)
             # Use in-place division to avoid creating a new tensor.
             logits.div_(t.unsqueeze(dim=1))
 
@@ -72,8 +76,9 @@ class Sampler(nn.Module):
         return _sample(probs, logprobs, seq_metadata_list)
 
 
-def _get_logits(hidden_states: torch.Tensor, embedding: torch.Tensor,
-                vocab_size: int) -> torch.Tensor:
+def _get_logits(
+    hidden_states: torch.Tensor, embedding: torch.Tensor, vocab_size: int
+) -> torch.Tensor:
     # Get the logits for the next tokens.
     logits = torch.matmul(hidden_states, embedding.t())
     logits = gather_from_tensor_model_parallel_region(logits)
@@ -97,14 +102,13 @@ def _prune_hidden_states(
             last_token_indices.append(token_idx)
             token_idx += 1
 
-    last_token_indices = torch.tensor(last_token_indices,
-                                      dtype=torch.long,
-                                      device=hidden_states.device)
+    last_token_indices = torch.tensor(
+        last_token_indices, dtype=torch.long, device=hidden_states.device
+    )
     return hidden_states.index_select(0, last_token_indices)
 
 
-def _get_temperatures(
-        seq_metadata_list: List[SequenceMetadata]) -> List[float]:
+def _get_temperatures(seq_metadata_list: List[SequenceMetadata]) -> List[float]:
     # Collect the temperatures for the logits.
     temperatures: List[float] = []
     for seq_metadata in seq_metadata_list:
@@ -158,20 +162,25 @@ def _apply_top_p_top_k(
     logits_sort[top_k_mask] = -float("inf")
 
     # Re-sort the probabilities.
-    logits = torch.gather(logits_sort,
-                          dim=-1,
-                          index=torch.argsort(logits_idx, dim=-1))
+    logits = torch.gather(logits_sort, dim=-1, index=torch.argsort(logits_idx, dim=-1))
     return logits
 
 
 def _greedy_sample(
-    logprobs: torch.Tensor, ) -> List[Tuple[List[int], List[int]]]:
+    logprobs: torch.Tensor,
+) -> List[Tuple[List[int], List[int]]]:
     return torch.argmax(logprobs, dim=-1).view(-1).cpu().tolist()
 
 
-def _random_sample(probs: torch.Tensor, ) -> List[Tuple[List[int], List[int]]]:
-    random_samples = torch.multinomial(
-        probs, num_samples=1, replacement=True).view(-1).cpu().tolist()
+def _random_sample(
+    probs: torch.Tensor,
+) -> List[Tuple[List[int], List[int]]]:
+    random_samples = (
+        torch.multinomial(probs, num_samples=1, replacement=True)
+        .view(-1)
+        .cpu()
+        .tolist()
+    )
 
     return random_samples
 
@@ -196,10 +205,10 @@ def _sample(
         num_tokens = category_num_tokens[sampling_type]
         if num_tokens == 0:
             continue
-        category_logprobs = logprobs[category_start_idx:category_start_idx +
-                                     num_tokens]
-        category_probs = probs[category_start_idx:category_start_idx +
-                               num_tokens]
+        category_logprobs = logprobs[
+            category_start_idx : category_start_idx + num_tokens
+        ]
+        category_probs = probs[category_start_idx : category_start_idx + num_tokens]
         if sampling_type == SamplingType.GREEDY:
             sample_results = _greedy_sample(category_logprobs)
         elif sampling_type == SamplingType.RANDOM:

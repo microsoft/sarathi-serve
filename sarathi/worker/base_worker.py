@@ -1,28 +1,34 @@
 """A GPU worker class."""
+
 import os
 import time
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.distributed
 
-from sarathi.config import (CacheConfig, ModelConfig, ParallelConfig,
-                            MetricsConfig, BaseSchedulerConfig)
-from sarathi.model_executor import set_random_seed
-from sarathi.model_executor.parallel_utils.parallel_state import (
-    initialize_model_parallel,
-    get_tensor_model_parallel_rank,
-    get_pipeline_model_parallel_rank,
+from sarathi.config import (
+    BaseSchedulerConfig,
+    CacheConfig,
+    MetricsConfig,
+    ModelConfig,
+    ParallelConfig,
 )
-from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence
-from sarathi.worker.cache_engine import CacheEngine
-from sarathi.metrics.metrics_store import MetricsStore
-from sarathi.utils.threading_utils import synchronized
-from sarathi.model_executor.model_runner import ModelRunner
-from sarathi.logger import init_logger
-from sarathi.model_executor.attention import set_attention_backend
-from sarathi.core.sequence_manager.worker_sequence_manager import WorkerSequenceManager
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
+from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence
+from sarathi.core.sequence_manager.worker_sequence_manager import WorkerSequenceManager
+from sarathi.logger import init_logger
+from sarathi.metrics.metrics_store import MetricsStore
+from sarathi.model_executor import set_random_seed
+from sarathi.model_executor.attention import set_attention_backend
+from sarathi.model_executor.model_runner import ModelRunner
+from sarathi.model_executor.parallel_utils.parallel_state import (
+    get_pipeline_model_parallel_rank,
+    get_tensor_model_parallel_rank,
+    initialize_model_parallel,
+)
+from sarathi.utils.threading_utils import synchronized
+from sarathi.worker.cache_engine import CacheEngine
 
 logger = init_logger(__name__)
 
@@ -91,28 +97,36 @@ class BaseWorker:
         torch.cuda.set_device(self.device)
 
         # Initialize the distributed environment.
-        _init_distributed_environment(self.parallel_config, self.rank,
-                                      self.distributed_init_method)
+        _init_distributed_environment(
+            self.parallel_config, self.rank, self.distributed_init_method
+        )
 
         self.tensor_model_parallel_rank = get_tensor_model_parallel_rank()
         self.pipeline_model_parallel_rank = get_pipeline_model_parallel_rank()
 
         self.is_tensor_parallel_rank_zero = self.tensor_model_parallel_rank == 0
         self.is_first_pipeline_stage = self.pipeline_model_parallel_rank == 0
-        self.is_last_pipeline_stage = self.pipeline_model_parallel_rank == self.parallel_config.pipeline_parallel_size - 1
+        self.is_last_pipeline_stage = (
+            self.pipeline_model_parallel_rank
+            == self.parallel_config.pipeline_parallel_size - 1
+        )
 
         logger.info(
             f"Initializing worker {self.rank} on device {self.device}, "
             f"tensor parallel rank {self.tensor_model_parallel_rank} "
-            f"and pipeline parallel rank {self.pipeline_model_parallel_rank}.")
+            f"and pipeline parallel rank {self.pipeline_model_parallel_rank}."
+        )
 
         # Initialize the model.
         set_random_seed(self.model_config.seed)
-        self.model_runner = ModelRunner(self.model_config,
-                                        self.parallel_config,
-                                        self.scheduler_config,
-                                        self.cache_config, self.device,
-                                        self.rank)
+        self.model_runner = ModelRunner(
+            self.model_config,
+            self.parallel_config,
+            self.scheduler_config,
+            self.cache_config,
+            self.device,
+            self.rank,
+        )
         logger.info(f"Model initialized on worker {self.rank}.")
 
     @torch.inference_mode()
@@ -122,8 +136,9 @@ class BaseWorker:
 
         self.cache_config = cache_config
 
-        self.cache_engine = CacheEngine(self.cache_config, self.model_config,
-                                        self.parallel_config)
+        self.cache_engine = CacheEngine(
+            self.cache_config, self.model_config, self.parallel_config
+        )
         self.gpu_cache = self.cache_engine.gpu_cache
 
         self.seq_manager = WorkerSequenceManager(
@@ -139,8 +154,9 @@ class BaseWorker:
     def get_model_parallel_ranks(self) -> Tuple[int, int]:
         return self.tensor_model_parallel_rank, self.pipeline_model_parallel_rank
 
-    def on_step_completed(self, scheduler_outputs: SchedulerOutputs,
-                          sampler_outputs: SamplerOutputs) -> None:
+    def on_step_completed(
+        self, scheduler_outputs: SchedulerOutputs, sampler_outputs: SamplerOutputs
+    ) -> None:
         self.seq_manager.on_step_completed(scheduler_outputs, sampler_outputs)
 
     @torch.inference_mode()
@@ -186,10 +202,12 @@ class BaseWorker:
 
     @synchronized
     def start_profiling(self) -> None:
-        self.profiler = torch.profiler.profile(activities=[
-            torch.profiler.ProfilerActivity.CPU,
-            torch.profiler.ProfilerActivity.CUDA,
-        ], )
+        self.profiler = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+        )
         self.profiler.__enter__()
 
     @synchronized
@@ -199,7 +217,8 @@ class BaseWorker:
         gpu_memory_utilization: float,
     ) -> Tuple[int, int]:
         return self.model_runner.profile_num_available_blocks(
-            block_size, gpu_memory_utilization)
+            block_size, gpu_memory_utilization
+        )
 
     @synchronized
     def stop_profiling(self) -> None:
@@ -221,11 +240,13 @@ def _init_distributed_environment(
             raise RuntimeError(
                 "torch.distributed is already initialized but the torch world "
                 "size does not match parallel_config.world_size "
-                f"({torch_world_size} vs. {parallel_config.world_size}).")
+                f"({torch_world_size} vs. {parallel_config.world_size})."
+            )
     elif not distributed_init_method:
         raise ValueError(
             "distributed_init_method must be set if torch.distributed "
-            "is not already initialized")
+            "is not already initialized"
+        )
     else:
         torch.distributed.init_process_group(
             backend="nccl",
@@ -236,5 +257,6 @@ def _init_distributed_environment(
 
     # A small all_reduce for warmup.
     torch.distributed.all_reduce(torch.zeros(1).cuda())
-    initialize_model_parallel(parallel_config.tensor_parallel_size,
-                              parallel_config.pipeline_parallel_size)
+    initialize_model_parallel(
+        parallel_config.tensor_parallel_size, parallel_config.pipeline_parallel_size
+    )

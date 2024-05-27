@@ -74,12 +74,17 @@ class SequenceState:
 
     @property
     def e2e_time(self) -> Optional[float]:
-        return self._completed_at - self._arrived_at if self._completed_at is not None else None
+        return (
+            self._completed_at - self._arrived_at
+            if self._completed_at is not None
+            else None
+        )
 
     @property
     def e2e_time_piecewise_normalized(self) -> float:
-        return self.scheduling_delay + (self.execution_plus_preemption_time /
-                                        self._num_output_tokens)
+        return self.scheduling_delay + (
+            self.execution_plus_preemption_time / self._num_output_tokens
+        )
 
     @property
     def e2e_time_normalized(self) -> float:
@@ -87,41 +92,68 @@ class SequenceState:
 
     @property
     def e2e_prefill_time(self) -> Optional[float]:
-        return self._prompt_processing_completed_at - self._arrived_at if self._prompt_processing_completed_at is not None else None
+        return (
+            self._prompt_processing_completed_at - self._arrived_at
+            if self._prompt_processing_completed_at is not None
+            else None
+        )
 
     @property
     def e2e_prefill_time_normalized(self) -> Optional[float]:
-        return (self.e2e_prefill_time / self._num_prompt_tokens
-                ) if self._prompt_processing_completed_at is not None else None
+        return (
+            (self.e2e_prefill_time / self._num_prompt_tokens)
+            if self._prompt_processing_completed_at is not None
+            else None
+        )
 
     @property
     def e2e_prefill_time_piecewise_normalized(self) -> Optional[float]:
-        return self.scheduling_delay + (
-            self.prefill_execution_plus_preemption_time /
-            self._num_prompt_tokens
-        ) if self._prompt_processing_completed_at else None
+        return (
+            self.scheduling_delay
+            + (self.prefill_execution_plus_preemption_time / self._num_prompt_tokens)
+            if self._prompt_processing_completed_at
+            else None
+        )
 
     @property
     def prefill_execution_plus_preemption_time(self) -> float:
-        return self._prompt_processing_completed_at - self._scheduled_at if self._prompt_processing_completed_at is not None else None
+        return (
+            self._prompt_processing_completed_at - self._scheduled_at
+            if self._prompt_processing_completed_at is not None
+            else None
+        )
 
     @property
     def decode_execution_plus_preemption_time(self) -> float:
-        return self._completed_at - self._prompt_processing_completed_at if self._completed_at is not None else None
+        return (
+            self._completed_at - self._prompt_processing_completed_at
+            if self._completed_at is not None
+            else None
+        )
 
     @property
-    def prefill_execution_plus_preemption_time_normalized(
-            self) -> Optional[float]:
-        return self.prefill_execution_plus_preemption_time / self._num_prompt_tokens if self.prefill_execution_plus_preemption_time else None
+    def prefill_execution_plus_preemption_time_normalized(self) -> Optional[float]:
+        return (
+            self.prefill_execution_plus_preemption_time / self._num_prompt_tokens
+            if self.prefill_execution_plus_preemption_time
+            else None
+        )
 
     @property
-    def decode_execution_plus_preemption_time_normalized(
-            self) -> Optional[float]:
-        return self.decode_execution_plus_preemption_time / self._num_output_tokens if self.decode_execution_plus_preemption_time else None
+    def decode_execution_plus_preemption_time_normalized(self) -> Optional[float]:
+        return (
+            self.decode_execution_plus_preemption_time / self._num_output_tokens
+            if self.decode_execution_plus_preemption_time
+            else None
+        )
 
     @property
     def scheduling_delay(self) -> Optional[float]:
-        return self._scheduled_at - self._arrived_at if self._scheduled_at is not None else None
+        return (
+            self._scheduled_at - self._arrived_at
+            if self._scheduled_at is not None
+            else None
+        )
 
     @property
     def execution_time(self) -> float:
@@ -160,7 +192,8 @@ class SequenceState:
         return self._is_ignore_finished
 
     def _handle_transitions_from_waiting_status(
-            self, current_time: float, status: SequenceStatus) -> None:
+        self, current_time: float, status: SequenceStatus
+    ) -> None:
         if status == SequenceStatus.RUNNING:
             # request is starting execution now
             if self._scheduled_at is None:
@@ -186,7 +219,8 @@ class SequenceState:
             )
 
     def _handle_transitions_from_running_status(
-            self, current_time: float, status: SequenceStatus) -> None:
+        self, current_time: float, status: SequenceStatus
+    ) -> None:
         self._execution_time += current_time - self._last_execution_start_at
 
         if status == SequenceStatus.PAUSED:
@@ -200,14 +234,15 @@ class SequenceState:
                 f"Invalid state transition from {self._status} to {status} for request {self._id}."
             )
 
-    def _handle_transitions_from_paused_status(self, current_time: float,
-                                               status: SequenceStatus) -> None:
+    def _handle_transitions_from_paused_status(
+        self, current_time: float, status: SequenceStatus
+    ) -> None:
         self._preempted_time += current_time - self._last_pause_at
 
-        if status in [
-                SequenceStatus.FINISHED_STOPPED,
-                SequenceStatus.FINISHED_LENGTH_CAPPED
-        ]:
+        if (
+            status == SequenceStatus.FINISHED_STOPPED
+            or status == SequenceStatus.FINISHED_LENGTH_CAPPED
+        ):
             self._is_completed = True
             self._completed_at = current_time
         elif status == SequenceStatus.RUNNING:
@@ -247,6 +282,8 @@ class SequenceState:
         if not self._last_token_generated_at:
             self._last_token_generation_time = 0
         else:
-            self._last_token_generation_time = current_time - self._last_token_generated_at
+            self._last_token_generation_time = (
+                current_time - self._last_token_generated_at
+            )
 
         self._last_token_generated_at = current_time

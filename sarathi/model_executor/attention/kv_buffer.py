@@ -1,5 +1,6 @@
-import torch
 from typing import Dict, Tuple
+
+import torch
 
 
 class KVBuffer:
@@ -63,8 +64,7 @@ class KVBuffer:
             self.v_buffer[start_offset:end_offset],
         )
 
-    def append(self, seq_id: int, key: torch.Tensor,
-               value: torch.Tensor) -> None:
+    def append(self, seq_id: int, key: torch.Tensor, value: torch.Tensor) -> None:
         assert key.shape == value.shape
         active_length = self.buffer_active_lens[seq_id]
         assert active_length + key.shape[0] <= self.max_seq_len

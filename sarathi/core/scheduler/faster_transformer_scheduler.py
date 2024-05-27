@@ -2,12 +2,14 @@ import time
 from typing import List
 
 from sarathi.config import CacheConfig, FasterTransformerSchedulerConfig
-from sarathi.logger import init_logger
+from sarathi.core.block_space_manager.faster_transformer_block_space_manager import (
+    FasterTransformerBlockSpaceManager,
+)
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SequenceScheduleMetadata
 from sarathi.core.datatypes.sequence_status import SequenceStatus
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.block_space_manager.faster_transformer_block_space_manager import FasterTransformerBlockSpaceManager
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -37,7 +39,8 @@ class FasterTransformerScheduler(BaseScheduler):
 
             assert seq.prompt_processing_finished
             scheduled_seq_metadata_list.append(
-                SequenceScheduleMetadata.from_sequence(seq))
+                SequenceScheduleMetadata.from_sequence(seq)
+            )
 
         if scheduled_seq_metadata_list:
             return SchedulerOutputs(
@@ -74,7 +77,8 @@ class FasterTransformerScheduler(BaseScheduler):
             self._allocate(seq)
             self.running.append(seq)
             scheduled_seq_metadata_list.append(
-                SequenceScheduleMetadata.from_sequence(seq))
+                SequenceScheduleMetadata.from_sequence(seq)
+            )
 
         scheduler_outputs = SchedulerOutputs(
             id=self._iteration_id,

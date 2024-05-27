@@ -1,7 +1,7 @@
-import torch
-
 from time import perf_counter
 from typing import Optional
+
+import torch
 
 from sarathi.metrics.constants import CpuOperationMetrics
 from sarathi.metrics.metrics_store import MetricsStore
@@ -14,7 +14,8 @@ class CpuTimer:
         self.start_time = None
         self.metrics_store = MetricsStore()
         self.disabled = not self.metrics_store.is_op_enabled(
-            metric_name=self.name, rank=rank)
+            metric_name=self.name, rank=rank
+        )
 
     def __enter__(self):
         if self.disabled:
@@ -29,6 +30,5 @@ class CpuTimer:
 
         torch.cuda.synchronize()
         self.metrics_store.push_cpu_operation_metrics(
-            self.name,
-            (perf_counter() - self.start_time) * 1e3  # convert to ms
+            self.name, (perf_counter() - self.start_time) * 1e3  # convert to ms
         )

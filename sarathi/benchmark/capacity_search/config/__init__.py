@@ -1,9 +1,9 @@
 from sarathi.benchmark.capacity_search.config.config import (
+    BenchmarkConfig,
     JobConfig,
     ModelConfig,
-    SchedulerConfig,
     ParallelConfig,
-    BenchmarkConfig,
+    SchedulerConfig,
     TraceConfig,
 )
 

@@ -1,7 +1,10 @@
 from typing import List
+
+from sarathi.config import BaseSchedulerConfig, CacheConfig
+from sarathi.core.block_space_manager.block_space_manager_registry import (
+    BlockSpaceManagerRegistry,
+)
 from sarathi.core.datatypes.sequence import Sequence, SequenceScheduleMetadata
-from sarathi.core.block_space_manager.block_space_manager_registry import BlockSpaceManagerRegistry
-from sarathi.config import CacheConfig, BaseSchedulerConfig
 from sarathi.core.sequence_manager.base_sequence_manager import BaseSequenceManager
 
 
@@ -36,8 +39,7 @@ class WorkerSequenceManager(BaseSequenceManager):
         seq = self.seq_map[seq_id]
         self.block_manager.free(seq)
 
-    def _on_seq_scheduled(
-            self, seq_sched_metadata: SequenceScheduleMetadata) -> None:
+    def _on_seq_scheduled(self, seq_sched_metadata: SequenceScheduleMetadata) -> None:
         super()._on_seq_scheduled(seq_sched_metadata)
         seq = self.seq_map[seq_sched_metadata.seq_id]
 

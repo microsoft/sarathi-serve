@@ -1,24 +1,18 @@
 import argparse
 import glob
+import json
 import os
 import shlex
-import json
 from subprocess import Popen
 
 import pandas as pd
 import ray
 import wandb
 
-from sarathi.logger import init_logger
-from sarathi.benchmark.capacity_search.config import (
-    JobConfig,
-    BenchmarkConfig,
-)
-from sarathi.benchmark.capacity_search.ray_utils import (
-    ResourceManager,
-    get_ip,
-)
+from sarathi.benchmark.capacity_search.config import BenchmarkConfig, JobConfig
+from sarathi.benchmark.capacity_search.ray_utils import ResourceManager, get_ip
 from sarathi.benchmark.types import ReplicaResourceMapping
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -54,15 +48,15 @@ class CapacitySearch:
         if not self.resource_mapping:
             return
 
-        ray.get(
-            self.resource_manager.release_resources.remote(
-                self.resource_mapping))
+        ray.get(self.resource_manager.release_resources.remote(self.resource_mapping))
 
     def _generate_run_command(
         self,
         benchmark_config: BenchmarkConfig,
     ):
-        resource_mapping_arg = f"--replica_resource_mapping '{json.dumps(self.resource_mapping)}'"
+        resource_mapping_arg = (
+            f"--replica_resource_mapping '{json.dumps(self.resource_mapping)}'"
+        )
         command = f"python -m sarathi.benchmark.main {benchmark_config.to_args()} {resource_mapping_arg}"
         logger.debug(f"Running command: {command}", flush=True)
 
@@ -82,17 +76,19 @@ class CapacitySearch:
         benchmark_config: BenchmarkConfig,
     ) -> tuple[bool, float, float, str]:
         scheduling_delay_df = pd.read_csv(scheduling_delay_file)
-        scheduling_delay = scheduling_delay_df[
-            "request_scheduling_delay"].quantile(
-                self.args.scheduling_delay_slo_quantile)
+        scheduling_delay = scheduling_delay_df["request_scheduling_delay"].quantile(
+            self.args.scheduling_delay_slo_quantile
+        )
 
         tbt_df = pd.read_csv(tbt_file)
         tbt = tbt_df["decode_token_execution_plus_preemption_time"].quantile(
-            self.args.tbt_slo_quantile)
+            self.args.tbt_slo_quantile
+        )
 
         is_under_scheduling_delay_sla = (
             scheduling_delay <= self.args.scheduling_delay_slo_value
-            and tbt <= self.args.tbt_slo_value)
+            and tbt <= self.args.tbt_slo_value
+        )
 
         logger.info(
             f"{benchmark_config.to_human_readable_name()} - "
@@ -100,7 +96,11 @@ class CapacitySearch:
             f" - TBT (P{self.args.tbt_slo_quantile}): {tbt}",
             flush=True,
         )
-        return is_under_scheduling_delay_sla, scheduling_delay, tbt, benchmark_config.get_run_id(
+        return (
+            is_under_scheduling_delay_sla,
+            scheduling_delay,
+            tbt,
+            benchmark_config.get_run_id(),
         )
 
     def is_under_sla(self, qps: float) -> tuple[bool, float, float, str]:
@@ -117,13 +117,16 @@ class CapacitySearch:
         os.makedirs(run_dir, exist_ok=True)
 
         cached_scheduling_delay_file = self._get_result_file(
-            run_dir, "request_scheduling_delay")
+            run_dir, "request_scheduling_delay"
+        )
         cached_tbt_file = self._get_result_file(
-            run_dir, "decode_token_execution_plus_preemption_time")
+            run_dir, "decode_token_execution_plus_preemption_time"
+        )
 
         if cached_scheduling_delay_file is not None and cached_tbt_file is not None:
-            return self._is_under_sla(cached_scheduling_delay_file,
-                                      cached_tbt_file, benchmark_config)
+            return self._is_under_sla(
+                cached_scheduling_delay_file, cached_tbt_file, benchmark_config
+            )
 
         command = self._generate_run_command(benchmark_config)
 
@@ -137,14 +140,15 @@ class CapacitySearch:
         p.wait()
 
         scheduling_delay_file = self._get_result_file(
-            run_dir, "request_scheduling_delay")
+            run_dir, "request_scheduling_delay"
+        )
         tbt_file = self._get_result_file(
-            run_dir, "decode_token_execution_plus_preemption_time")
+            run_dir, "decode_token_execution_plus_preemption_time"
+        )
         assert (
             scheduling_delay_file is not None and tbt_file is not None
         ), f"Result file not found for {benchmark_config.to_human_readable_name()}"
-        return self._is_under_sla(scheduling_delay_file, tbt_file,
-                                  benchmark_config)
+        return self._is_under_sla(scheduling_delay_file, tbt_file, benchmark_config)
 
     @release_resources_on_failure
     def search(self):
@@ -171,8 +175,7 @@ class CapacitySearch:
         for _ in range(self.args.max_iterations):
             logger.info(f"Searching between {left} and {right}", flush=True)
             # stopping condition - we have reached the minimum granularity
-            if abs(left -
-                   right) < self.args.min_search_granularity * qps / 100:
+            if abs(left - right) < self.args.min_search_granularity * qps / 100:
                 break
 
             qps = (left + right) / 2
@@ -186,8 +189,7 @@ class CapacitySearch:
 
             print(f"Searching between {left} and {right} - qps: {qps}", flush=True)
 
-            is_under_sla, scheduling_delay, tbt, run_id = self.is_under_sla(
-                qps)
+            is_under_sla, scheduling_delay, tbt, run_id = self.is_under_sla(qps)
 
             if scheduling_delay is None:
                 break

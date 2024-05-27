@@ -1,12 +1,13 @@
 """CacheEngine class for managing the KV cache."""
+
 from typing import List, Tuple, Union
 
 import torch
 
 from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
 from sarathi.logger import init_logger
-from sarathi.utils import in_wsl
 from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.utils import in_wsl
 
 logger = init_logger(__name__)
 
@@ -45,7 +46,8 @@ class CacheEngine:
 
         for _ in range(self.num_layers):
             gpu_blocks = get_attention_wrapper().get_cache_block(
-                self.num_gpu_blocks, dtype=self.dtype, device="cuda")
+                self.num_gpu_blocks, dtype=self.dtype, device="cuda"
+            )
             gpu_cache.append(gpu_blocks)
         return gpu_cache
 

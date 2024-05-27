@@ -1,7 +1,8 @@
 from typing import Tuple
 
 from sarathi.benchmark.request_generator.base_request_length_generator import (
-    BaseRequestLengthGenerator, )
+    BaseRequestLengthGenerator,
+)
 from sarathi.benchmark.utils.zipf_generator import ZipfGenerator
 
 
@@ -22,7 +23,8 @@ class ZipfRequestLengthGenerator(BaseRequestLengthGenerator):
         total_tokens = self._zipf_generator.next()
 
         decode_tokens = total_tokens / (
-            1 + self._config.zipf_request_generator_prefill_to_decode_ratio)
+            1 + self._config.zipf_request_generator_prefill_to_decode_ratio
+        )
         prefill_tokens = total_tokens - decode_tokens
 
         return prefill_tokens, decode_tokens

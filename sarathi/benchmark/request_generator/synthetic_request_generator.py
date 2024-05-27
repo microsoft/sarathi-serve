@@ -1,11 +1,15 @@
 from typing import List
 
 from sarathi.benchmark.entities import Request
-from sarathi.benchmark.request_generator.base_request_generator import BaseRequestGenerator
+from sarathi.benchmark.request_generator.base_request_generator import (
+    BaseRequestGenerator,
+)
 from sarathi.benchmark.request_generator.request_interval_generator_registry import (
-    RequestIntervalGeneratorRegistry, )
+    RequestIntervalGeneratorRegistry,
+)
 from sarathi.benchmark.request_generator.request_length_generator_registry import (
-    RequestLengthGeneratorRegistry, )
+    RequestLengthGeneratorRegistry,
+)
 from sarathi.benchmark.utils.random import set_seeds
 
 
@@ -17,16 +21,18 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
         self._seed = self._config.seed
 
         self._request_length_generator = RequestLengthGeneratorRegistry.get_from_str(
-            self._config.synthetic_request_generator_length_provider,
-            self._config)
+            self._config.synthetic_request_generator_length_provider, self._config
+        )
         self._request_interval_generator = (
             RequestIntervalGeneratorRegistry.get_from_str(
-                self._config.synthetic_request_generator_interval_provider,
-                self._config))
+                self._config.synthetic_request_generator_interval_provider, self._config
+            )
+        )
 
     def _generate_next_request(self, last_arrived_at: float) -> Request:
         inter_request_time = (
-            self._request_interval_generator.get_next_inter_request_time())
+            self._request_interval_generator.get_next_inter_request_time()
+        )
         if inter_request_time is None:
             return None
         arrived_at = last_arrived_at + inter_request_time
@@ -57,8 +63,7 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
                 current_time = request.arrived_at
                 requests.append(request)
         elif self._config.synthetic_request_generator_num_requests is not None:
-            for _ in range(
-                    self._config.synthetic_request_generator_num_requests):
+            for _ in range(self._config.synthetic_request_generator_num_requests):
                 request = self._generate_next_request(current_time)
                 current_time = request.arrived_at
                 requests.append(request)
@@ -74,10 +79,11 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
         return requests
 
     def generate_requests(self) -> List[Request]:
-        assert (self._config.synthetic_request_generator_num_requests
-                or self._config.synthetic_request_generator_duration
-                or self._config.synthetic_request_generator_interval_provider
-                == "trace")
+        assert (
+            self._config.synthetic_request_generator_num_requests
+            or self._config.synthetic_request_generator_duration
+            or self._config.synthetic_request_generator_interval_provider == "trace"
+        )
 
         set_seeds(self._seed)
 
@@ -88,8 +94,10 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
         # remove any requests that arrived after the time limit
         if self._config.synthetic_request_generator_duration is not None:
             requests = [
-                request for request in requests if request.arrived_at <
-                self._config.synthetic_request_generator_duration
+                request
+                for request in requests
+                if request.arrived_at
+                < self._config.synthetic_request_generator_duration
             ]
 
         return requests

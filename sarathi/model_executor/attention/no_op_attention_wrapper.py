@@ -1,6 +1,7 @@
+from typing import List, Optional, Tuple
+
 import torch
 
-from typing import List, Optional, Tuple
 from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
@@ -18,8 +19,9 @@ class NoOpAttentionWrapper(BaseAttentionWrapper):
     ):
         self.device = device
 
-    def get_cache_block(self, num_blocks: int,
-                        **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_cache_block(
+        self, num_blocks: int, **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         pass
 
     def begin_forward(

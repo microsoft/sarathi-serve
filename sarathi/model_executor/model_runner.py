@@ -1,22 +1,27 @@
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import torch
 import torch.distributed
 
-from sarathi.logger import init_logger
-from sarathi.config import (CacheConfig, ModelConfig, ParallelConfig,
-                            BaseSchedulerConfig, SchedulerType)
-from sarathi.model_executor import get_model, set_random_seed
+from sarathi.config import (
+    BaseSchedulerConfig,
+    CacheConfig,
+    ModelConfig,
+    ParallelConfig,
+    SchedulerType,
+)
 from sarathi.core.datatypes.sampling_params import SamplingParams
-from sarathi.model_executor.layers.sampler import Sampler
 from sarathi.core.datatypes.sequence import Sequence, SequenceMetadata
-from sarathi.worker.cache_engine import CacheEngine
-from sarathi.utils import get_gpu_memory
+from sarathi.logger import init_logger
 from sarathi.metrics.constants import CpuOperationMetrics, OperationMetrics
 from sarathi.metrics.cpu_timer import CpuTimer
 from sarathi.metrics.cuda_timer import CudaTimer
+from sarathi.model_executor import get_model, set_random_seed
 from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.model_executor.layers.sampler import Sampler
 from sarathi.model_executor.utils import pad_to_alignment
+from sarathi.utils import get_gpu_memory
+from sarathi.worker.cache_engine import CacheEngine
 
 logger = init_logger(__name__)
 
@@ -48,15 +53,19 @@ class ModelRunner:
 
         self.sampler: Optional[Sampler] = None
         if self.model.lm_head:
-            self.sampler = Sampler(self.model.lm_head.weight,
-                                   self.model.config.vocab_size)
+            self.sampler = Sampler(
+                self.model.lm_head.weight, self.model.config.vocab_size
+            )
 
         self._prepare_inputs_e2e_timer = CpuTimer(
-            CpuOperationMetrics.PREPARE_INPUTS_E2E, rank=self.rank)
-        self._sampler_e2e_timer = CpuTimer(CpuOperationMetrics.SAMPLER_E2E,
-                                           rank=self.rank)
+            CpuOperationMetrics.PREPARE_INPUTS_E2E, rank=self.rank
+        )
+        self._sampler_e2e_timer = CpuTimer(
+            CpuOperationMetrics.SAMPLER_E2E, rank=self.rank
+        )
         self._model_execution_e2e_timer = CpuTimer(
-            CpuOperationMetrics.MODEL_EXECUTION_E2E, rank=self.rank)
+            CpuOperationMetrics.MODEL_EXECUTION_E2E, rank=self.rank
+        )
 
     def _prepare_inputs(
         self,
@@ -72,18 +81,17 @@ class ModelRunner:
                 continue
 
             prompt_chunk_len = seq_metadata.prompt_chunk_len
-            current_prompt_chunk_tokens = seq_metadata.seq.get_next_prompt_chunk_token_ids(
-                prompt_chunk_len)
+            current_prompt_chunk_tokens = (
+                seq_metadata.seq.get_next_prompt_chunk_token_ids(prompt_chunk_len)
+            )
             current_prompt_chunk_len = len(current_prompt_chunk_tokens)
             current_prompt_chunk_lens.append(current_prompt_chunk_len)
-            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed(
-            )
+            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed()
 
             current_total_len = processed_prompt_len + current_prompt_chunk_len
 
             input_tokens.extend(current_prompt_chunk_tokens)
-            input_positions.extend(
-                range(processed_prompt_len, current_total_len))
+            input_positions.extend(range(processed_prompt_len, current_total_len))
 
         for seq_metadata in seq_metadata_list:
             if seq_metadata.is_prompt:
@@ -102,12 +110,10 @@ class ModelRunner:
         input_positions = pad_to_alignment(input_positions, multiple_of=8)
 
         # Convert to tensors.
-        tokens_tensor = torch.tensor(input_tokens,
-                                     dtype=torch.long,
-                                     device=self.device)
-        positions_tensor = torch.tensor(input_positions,
-                                        dtype=torch.long,
-                                        device=self.device)
+        tokens_tensor = torch.tensor(input_tokens, dtype=torch.long, device=self.device)
+        positions_tensor = torch.tensor(
+            input_positions, dtype=torch.long, device=self.device
+        )
 
         return tokens_tensor, positions_tensor
 
@@ -132,7 +138,10 @@ class ModelRunner:
 
         seq_metadata_list: List[SequenceMetadata] = []
 
-        if self.scheduler_config.type == SchedulerType.SARATHI or self.scheduler_config.type == SchedulerType.SIMPLE_CHUNKING:
+        if (
+            self.scheduler_config.type == SchedulerType.SARATHI
+            or self.scheduler_config.type == SchedulerType.SIMPLE_CHUNKING
+        ):
             # Profile memory usage with a single `chunk_size` chunk
             # which is the last chunk in the longest supported sequence.
             chunk_size = self.scheduler_config.chunk_size
@@ -157,8 +166,9 @@ class ModelRunner:
             # Profile memory usage with max_num_sequences sequences and the total
             # number of tokens equal to max_num_batched_tokens.
             for seq_id in range(max_num_seqs):
-                seq_len = (max_num_batched_tokens // max_num_seqs +
-                           (seq_id < max_num_batched_tokens % max_num_seqs))
+                seq_len = max_num_batched_tokens // max_num_seqs + (
+                    seq_id < max_num_batched_tokens % max_num_seqs
+                )
 
                 seq = Sequence(
                     seq_id=seq_id,
@@ -193,10 +203,12 @@ class ModelRunner:
         peak_memory = torch.cuda.max_memory_allocated()
         total_gpu_memory = get_gpu_memory()
         cache_block_size = CacheEngine.get_cache_block_size(
-            block_size, self.model_config, self.parallel_config)
+            block_size, self.model_config, self.parallel_config
+        )
         num_gpu_blocks = int(
-            (total_gpu_memory * gpu_memory_utilization - peak_memory) //
-            cache_block_size)
+            (total_gpu_memory * gpu_memory_utilization - peak_memory)
+            // cache_block_size
+        )
         num_gpu_blocks = max(num_gpu_blocks, 0)
         torch.cuda.empty_cache()
 
@@ -228,7 +240,9 @@ class ModelRunner:
                     kv_caches=gpu_cache,
                 )
             except RuntimeError as e:
-                logger.error(f"RuntimeError: {e} for seq_metadata_list: {seq_metadata_list}")
+                logger.error(
+                    f"RuntimeError: {e} for seq_metadata_list: {seq_metadata_list}"
+                )
                 raise e
 
         with self._sampler_e2e_timer:

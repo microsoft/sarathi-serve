@@ -1,5 +1,5 @@
-from abc import abstractmethod, ABC
-from typing import List, Optional, Union, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Optional, Tuple, Union
 
 import torch
 
@@ -33,9 +33,7 @@ class BaseAttentionWrapper(ABC):
     So, we have timers for each layer separately.
     """
 
-    def get_timer(self,
-                  operation: OperationMetrics,
-                  layer_id: Optional[int] = None):
+    def get_timer(self, operation: OperationMetrics, layer_id: Optional[int] = None):
         if self._timers.get((operation, layer_id)) is None:
             self._timers[(operation,
                           layer_id)] = CudaTimer(operation, layer_id)

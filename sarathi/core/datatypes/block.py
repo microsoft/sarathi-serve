@@ -1,4 +1,5 @@
 """Token blocks."""
+
 from typing import List
 
 _BLANK_TOKEN_ID = -1
@@ -34,11 +35,11 @@ class LogicalTokenBlock:
     def append_tokens(self, token_ids: List[int]) -> None:
         assert len(token_ids) <= self.get_num_empty_slots()
         curr_idx = self.num_tokens
-        self.token_ids[curr_idx:curr_idx + len(token_ids)] = token_ids
+        self.token_ids[curr_idx : curr_idx + len(token_ids)] = token_ids
         self.num_tokens += len(token_ids)
 
     def get_token_ids(self) -> List[int]:
-        return self.token_ids[:self.num_tokens]
+        return self.token_ids[: self.num_tokens]
 
     def get_last_token_id(self) -> int:
         assert self.num_tokens > 0
@@ -57,5 +58,7 @@ class PhysicalTokenBlock:
         self.block_size = block_size
 
     def __repr__(self) -> str:
-        return (f'PhysicalTokenBlock(device={self.device}, '
-                f'block_number={self.block_number})')
+        return (
+            f"PhysicalTokenBlock(device={self.device}, "
+            f"block_number={self.block_number})"
+        )

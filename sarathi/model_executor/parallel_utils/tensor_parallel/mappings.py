@@ -5,10 +5,11 @@
 import torch
 
 from sarathi.model_executor.parallel_utils.parallel_state import (
+    get_tensor_model_parallel_group,
     get_tensor_model_parallel_rank,
     get_tensor_model_parallel_world_size,
-    get_tensor_model_parallel_group,
 )
+
 from .utils import split_tensor_along_last_dim
 
 
@@ -16,7 +17,7 @@ def _reduce(input_):
     """All-reduce the input tensor across model parallel group."""
 
     # Bypass the function if we are using only 1 GPU.
-    if get_tensor_model_parallel_world_size()==1:
+    if get_tensor_model_parallel_world_size() == 1:
         return input_
 
     # All-reduce.
@@ -55,13 +56,14 @@ def _split_along_first_dim(input_):
 
     # Split along first dimension.
     dim_size = input_.size()[0]
-    assert dim_size % world_size == 0, \
-        "First dimension of the tensor should be divisible by tensor parallel size"
+    assert (
+        dim_size % world_size == 0
+    ), "First dimension of the tensor should be divisible by tensor parallel size"
     local_dim_size = dim_size // world_size
     rank = get_tensor_model_parallel_rank()
     dim_offset = rank * local_dim_size
 
-    output = input_[dim_offset:dim_offset+local_dim_size].contiguous()
+    output = input_[dim_offset : dim_offset + local_dim_size].contiguous()
 
     return output
 
@@ -80,7 +82,9 @@ def _gather_along_last_dim(input_):
 
     tensor_list = [torch.empty_like(input_) for _ in range(world_size)]
     tensor_list[rank] = input_
-    torch.distributed.all_gather(tensor_list, input_, group=get_tensor_model_parallel_group())
+    torch.distributed.all_gather(
+        tensor_list, input_, group=get_tensor_model_parallel_group()
+    )
 
     # Note: torch.cat already creates a contiguous tensor.
     output = torch.cat(tensor_list, dim=last_dim).contiguous()
@@ -99,12 +103,15 @@ def _gather_along_first_dim(input_):
     dim_size = list(input_.size())
     dim_size[0] = dim_size[0] * world_size
 
-    output = torch.empty(dim_size, dtype=input_.dtype,
-                         device=torch.cuda.current_device())
-    torch.distributed._all_gather_base(output, input_.contiguous(),
-                                       group=get_tensor_model_parallel_group())
+    output = torch.empty(
+        dim_size, dtype=input_.dtype, device=torch.cuda.current_device()
+    )
+    torch.distributed._all_gather_base(
+        output, input_.contiguous(), group=get_tensor_model_parallel_group()
+    )
 
     return output
+
 
 def _reduce_scatter_along_first_dim(input_):
     """Reduce-scatter the input tensor across model parallel group."""
@@ -114,15 +121,18 @@ def _reduce_scatter_along_first_dim(input_):
         return input_
 
     dim_size = list(input_.size())
-    assert dim_size[0] % world_size == 0, \
-        "First dimension of the tensor should be divisible by tensor parallel size"
+    assert (
+        dim_size[0] % world_size == 0
+    ), "First dimension of the tensor should be divisible by tensor parallel size"
 
     dim_size[0] = dim_size[0] // world_size
 
-    output = torch.empty(dim_size, dtype=input_.dtype,
-                         device=torch.cuda.current_device())
-    torch.distributed._reduce_scatter_base(output, input_.contiguous(),
-                                           group=get_tensor_model_parallel_group())
+    output = torch.empty(
+        dim_size, dtype=input_.dtype, device=torch.cuda.current_device()
+    )
+    torch.distributed._reduce_scatter_base(
+        output, input_.contiguous(), group=get_tensor_model_parallel_group()
+    )
     return output
 
 
@@ -252,6 +262,7 @@ class _ReduceScatterToSequenceParallelRegion(torch.autograd.Function):
 # Helper functions.
 # -----------------
 
+
 def copy_to_tensor_model_parallel_region(input_):
     return _CopyToModelParallelRegion.apply(input_)
 
@@ -278,4 +289,3 @@ def gather_from_sequence_parallel_region(input_, tensor_parallel_output_grad=Tru
 
 def reduce_scatter_to_sequence_parallel_region(input_):
     return _ReduceScatterToSequenceParallelRegion.apply(input_)
-

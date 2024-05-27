@@ -2,11 +2,13 @@ import time
 from typing import List
 
 from sarathi.config import CacheConfig, OrcaSchedulerConfig
-from sarathi.logger import init_logger
+from sarathi.core.block_space_manager.orca_block_space_manager import (
+    OrcaBlockSpaceManager,
+)
+from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SequenceScheduleMetadata
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
-from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.block_space_manager.orca_block_space_manager import OrcaBlockSpaceManager
+from sarathi.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -38,7 +40,8 @@ class OrcaScheduler(BaseScheduler):
             assert seq.prompt_processing_finished
 
             scheduled_seq_metadata_list.append(
-                SequenceScheduleMetadata.from_sequence(seq))
+                SequenceScheduleMetadata.from_sequence(seq)
+            )
 
         # Optimization: We do not sort the waiting queue since the preempted
         # sequences are added to the front and the new sequences
@@ -65,7 +68,8 @@ class OrcaScheduler(BaseScheduler):
             self._allocate(seq)
             self.running.append(seq)
             scheduled_seq_metadata_list.append(
-                SequenceScheduleMetadata.from_sequence(seq))
+                SequenceScheduleMetadata.from_sequence(seq)
+            )
 
         return SchedulerOutputs(
             id=self._iteration_id,

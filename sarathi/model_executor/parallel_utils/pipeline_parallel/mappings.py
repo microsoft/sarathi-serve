@@ -1,12 +1,12 @@
 import torch
 
+from sarathi.metrics.constants import OperationMetrics
+from sarathi.metrics.cuda_timer import CudaTimer
 from sarathi.model_executor.parallel_utils.parallel_state import (
     get_pipeline_model_parallel_group,
     get_pipeline_model_parallel_next_rank,
     get_pipeline_model_parallel_prev_rank,
 )
-from sarathi.metrics.constants import OperationMetrics
-from sarathi.metrics.cuda_timer import CudaTimer
 
 
 def send(hidden_states: torch.tensor):

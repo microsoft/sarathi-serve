@@ -1,11 +1,11 @@
-import torch
-
-from vllm_flash_attn import flash_attn_with_kvcache
 from typing import List, Optional, Tuple
 
-from sarathi.logger import init_logger
+import torch
+from vllm_flash_attn import flash_attn_with_kvcache
+
 from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
+from sarathi.logger import init_logger
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 
@@ -32,8 +32,9 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
         self.prefill_block_tables: List[torch.Tensor] = None
         self.decode_block_table: torch.Tensor = None
 
-    def get_cache_block(self, num_blocks: int,
-                        **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_cache_block(
+        self, num_blocks: int, **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         k_cache = torch.randn(
             num_blocks,
             self.block_size,
@@ -76,19 +77,19 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
 
             prompt_chunk_len = seq_metadata.prompt_chunk_len
             current_prompt_chunk_len = seq_metadata.seq.get_next_prompt_chunk_len(
-                prompt_chunk_len)
-            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed(
+                prompt_chunk_len
             )
+            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed()
 
             current_total_len = processed_prompt_len + current_prompt_chunk_len
 
             prefill_query_lens.append(current_prompt_chunk_len)
             prefill_cache_lens.append([processed_prompt_len])
 
-            num_blocks_in_use = (current_total_len + self.block_size -
-                                 1) // self.block_size
-            prefill_block_tables.append(
-                seq_metadata.block_table[:num_blocks_in_use])
+            num_blocks_in_use = (
+                current_total_len + self.block_size - 1
+            ) // self.block_size
+            prefill_block_tables.append(seq_metadata.block_table[:num_blocks_in_use])
 
         for seq_metadata in seq_metadata_list:
             if seq_metadata.is_prompt:
@@ -112,8 +113,9 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
             for cache_lens in prefill_cache_lens
         ]
         self.prefill_block_tables = [
-            torch.tensor(block_table, dtype=torch.int32,
-                         device=self.device).reshape(1, -1)
+            torch.tensor(block_table, dtype=torch.int32, device=self.device).reshape(
+                1, -1
+            )
             for block_table in prefill_block_tables
         ]
 
@@ -121,19 +123,18 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
             # no decode block table
             return
 
-        self.decode_cache_len = torch.tensor(decode_cache_len,
-                                             dtype=torch.int32,
-                                             device=self.device)
+        self.decode_cache_len = torch.tensor(
+            decode_cache_len, dtype=torch.int32, device=self.device
+        )
 
-        max_decode_blocks = max(
-            len(seq_block) for seq_block in decode_block_table)
+        max_decode_blocks = max(len(seq_block) for seq_block in decode_block_table)
         decode_block_table_padded = [
             seq_block + [0] * (max_decode_blocks - len(seq_block))
             for seq_block in decode_block_table
         ]
-        self.decode_block_table = torch.tensor(decode_block_table_padded,
-                                               dtype=torch.int32,
-                                               device=self.device)
+        self.decode_block_table = torch.tensor(
+            decode_block_table_padded, dtype=torch.int32, device=self.device
+        )
 
     def end_forward(self):
         self.is_metadata_initialized = False
@@ -165,17 +166,18 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
 
         # first process the prefill attention
         for prefill_cache_len, prefill_block_table, query_len in zip(
-                self.prefill_cache_lens, self.prefill_block_tables,
-                self.prefill_query_lens):
+            self.prefill_cache_lens, self.prefill_block_tables, self.prefill_query_lens
+        ):
             with self.get_timer(OperationMetrics.ATTN_INPUT_RESHAPE, layer_id):
-                seq_query = query[token_offset:token_offset +
-                                  query_len].reshape(1, -1, self.num_q_heads,
-                                                     self.head_dim)
-                seq_key = key[token_offset:token_offset + query_len].reshape(
-                    1, -1, self.num_kv_heads, self.head_dim)
-                seq_value = value[token_offset:token_offset +
-                                  query_len].reshape(1, -1, self.num_kv_heads,
-                                                     self.head_dim)
+                seq_query = query[token_offset : token_offset + query_len].reshape(
+                    1, -1, self.num_q_heads, self.head_dim
+                )
+                seq_key = key[token_offset : token_offset + query_len].reshape(
+                    1, -1, self.num_kv_heads, self.head_dim
+                )
+                seq_value = value[token_offset : token_offset + query_len].reshape(
+                    1, -1, self.num_kv_heads, self.head_dim
+                )
 
             with self.get_timer(OperationMetrics.ATTN_PREFILL, layer_id):
                 seq_output = flash_attn_with_kvcache(
@@ -190,10 +192,10 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
                     causal=True,
                 )
 
-            with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE,
-                                layer_id):
-                output[token_offset:token_offset + query_len].copy_(
-                    seq_output.reshape(-1, self.num_q_heads * self.head_dim))
+            with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):
+                output[token_offset : token_offset + query_len].copy_(
+                    seq_output.reshape(-1, self.num_q_heads * self.head_dim)
+                )
 
             token_offset += query_len
 
@@ -203,15 +205,15 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
         decode_batch_size = self.decode_cache_len.size(0)
 
         with self.get_timer(OperationMetrics.ATTN_INPUT_RESHAPE, layer_id):
-            decode_query = query[token_offset:token_offset +
-                                 decode_batch_size].reshape(
-                                     -1, 1, self.num_q_heads, self.head_dim)
-            decode_key = key[token_offset:token_offset +
-                             decode_batch_size].reshape(
-                                 -1, 1, self.num_kv_heads, self.head_dim)
-            decode_value = value[token_offset:token_offset +
-                                 decode_batch_size].reshape(
-                                     -1, 1, self.num_kv_heads, self.head_dim)
+            decode_query = query[
+                token_offset : token_offset + decode_batch_size
+            ].reshape(-1, 1, self.num_q_heads, self.head_dim)
+            decode_key = key[token_offset : token_offset + decode_batch_size].reshape(
+                -1, 1, self.num_kv_heads, self.head_dim
+            )
+            decode_value = value[
+                token_offset : token_offset + decode_batch_size
+            ].reshape(-1, 1, self.num_kv_heads, self.head_dim)
 
         with self.get_timer(OperationMetrics.ATTN_DECODE, layer_id):
             try:
@@ -227,17 +229,21 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
                     causal=True,
                 )
             except RuntimeError as e:
-                if "If key is supplied, it must have seqlen <= the seqlen of the KV cache" in str(e):
+                if (
+                    "If key is supplied, it must have seqlen <= the seqlen of the KV cache"
+                    in str(e)
+                ):
                     logger.warning(
                         "Ran into transient error with flash attention: Key length is greater than the cache length. Skipping the attention computation."
                     )
                     return output
-                else: 
+                else:
                     raise e
 
         with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):
             # flatten the seq_output and copy it to the output tensor
-            output[token_offset:token_offset + decode_batch_size].copy_(
-                decode_output.reshape(-1, self.num_q_heads * self.head_dim))
+            output[token_offset : token_offset + decode_batch_size].copy_(
+                decode_output.reshape(-1, self.num_q_heads * self.head_dim)
+            )
 
         return output

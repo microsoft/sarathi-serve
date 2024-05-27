@@ -1,8 +1,10 @@
 """Custom normalization layers."""
+
+from typing import Optional
+
 import torch
 import torch.nn as nn
 
-from typing import Optional
 from sarathi import layernorm_ops
 from sarathi.metrics.cuda_timer import CudaTimer
 

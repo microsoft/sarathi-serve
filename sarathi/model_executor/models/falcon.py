@@ -26,31 +26,31 @@ from torch import nn
 from torch.nn import LayerNorm
 from transformers import FalconConfig as HF_FalconConfig
 
-from sarathi.model_executor.weight_utils import (convert_pyslice_to_tensor,
-                                                 hf_model_weights_iterator,
-                                                 load_tensor_parallel_weights)
-from sarathi.model_executor.parallel_utils.parallel_state import (
-    get_tensor_model_parallel_rank, get_tensor_model_parallel_world_size)
-from sarathi.model_executor.parallel_utils.tensor_parallel import (
-    VocabParallelEmbedding, ColumnParallelLinear, RowParallelLinear,
-    reduce_from_tensor_model_parallel_region)
-from sarathi.transformers_utils.configs import RWConfig
-from sarathi.model_executor.parallel_utils.parallel_state import (
-    get_tensor_model_parallel_rank,
-    get_tensor_model_parallel_world_size,
-    get_pipeline_model_parallel_rank,
-    get_pipeline_model_parallel_world_size,
-    is_pipeline_first_stage,
-    is_pipeline_last_stage,
-)
-from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import (
-    send,
-    recv,
-)
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
 from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.rotary_embedding import get_rope
+from sarathi.model_executor.parallel_utils.parallel_state import (
+    get_pipeline_model_parallel_rank,
+    get_pipeline_model_parallel_world_size,
+    get_tensor_model_parallel_rank,
+    get_tensor_model_parallel_world_size,
+    is_pipeline_first_stage,
+    is_pipeline_last_stage,
+)
+from sarathi.model_executor.parallel_utils.pipeline_parallel.mappings import recv, send
+from sarathi.model_executor.parallel_utils.tensor_parallel import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+    VocabParallelEmbedding,
+    reduce_from_tensor_model_parallel_region,
+)
+from sarathi.model_executor.weight_utils import (
+    convert_pyslice_to_tensor,
+    hf_model_weights_iterator,
+    load_tensor_parallel_weights,
+)
+from sarathi.transformers_utils.configs import RWConfig
 from sarathi.worker.cache_engine import KVCache
 
 FalconConfig = Union[HF_FalconConfig, RWConfig]
@@ -92,15 +92,13 @@ class FalconAttention(nn.Module):
             self.num_kv_heads = self.total_num_kv_heads // tp_size
             self.query_key_value = ColumnParallelLinear(
                 self.hidden_size,
-                (self.total_num_heads + 2 * self.total_num_kv_heads) *
-                self.head_dim,
+                (self.total_num_heads + 2 * self.total_num_kv_heads) * self.head_dim,
                 bias=config.bias,
                 gather_output=False,
                 perform_initialization=False,
                 skip_bias_add=True,
                 linear_metric_name=OperationMetrics.ATTN_PRE_PROJ,
-                communication_metric_name=OperationMetrics.
-                ATTN_PRE_PROJ_ALL_GATHER,
+                communication_metric_name=OperationMetrics.ATTN_PRE_PROJ_ALL_GATHER,
             )
         elif self.multi_query:
             self.total_num_kv_heads = 1
@@ -113,16 +111,15 @@ class FalconAttention(nn.Module):
                 perform_initialization=False,
                 skip_bias_add=True,
             )
-            self.key_value = FalconLinear(self.hidden_size,
-                                          2 * self.head_dim,
-                                          bias=config.bias)
+            self.key_value = FalconLinear(
+                self.hidden_size, 2 * self.head_dim, bias=config.bias
+            )
         else:
             self.total_num_kv_heads = self.total_num_heads
             self.num_kv_heads = self.num_heads
             self.query_key_value = ColumnParallelLinear(
                 self.hidden_size,
-                (self.total_num_heads + 2 * self.total_num_kv_heads) *
-                self.head_dim,
+                (self.total_num_heads + 2 * self.total_num_kv_heads) * self.head_dim,
                 bias=config.bias,
                 gather_output=False,
                 perform_initialization=False,
@@ -134,8 +131,9 @@ class FalconAttention(nn.Module):
 
         # Layer-wise attention scaling
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
-        self.reduce_row_parallel_results = not (config.new_decoder_architecture
-                                                or config.parallel_attn)
+        self.reduce_row_parallel_results = not (
+            config.new_decoder_architecture or config.parallel_attn
+        )
         self.dense = RowParallelLinear(
             self.hidden_size,
             self.hidden_size,
@@ -145,19 +143,18 @@ class FalconAttention(nn.Module):
             skip_bias_add=True,
             reduce_results=self.reduce_row_parallel_results,
             linear_metric_name=OperationMetrics.ATTN_POST_PROJ,
-            communication_metric_name=OperationMetrics.
-            ATTN_POST_PROJ_ALL_REDUCE,
+            communication_metric_name=OperationMetrics.ATTN_POST_PROJ_ALL_REDUCE,
         )
 
         self.use_rotary = config.rotary
         self.use_alibi = config.alibi
-        assert not (self.use_rotary and self.use_alibi), (
-            "Rotary and alibi are mutually exclusive.")
+        assert not (
+            self.use_rotary and self.use_alibi
+        ), "Rotary and alibi are mutually exclusive."
 
         if self.use_rotary:
             rope_theta = getattr(config, "rope_theta", 10000)
-            max_position_embeddings = getattr(config,
-                                              "max_position_embeddings", 8192)
+            max_position_embeddings = getattr(config, "max_position_embeddings", 8192)
             rope_scaling = getattr(config, "rope_scaling", None)
             self.rotary_emb = get_rope(
                 head_size=self.head_dim,
@@ -171,8 +168,7 @@ class FalconAttention(nn.Module):
         elif self.use_alibi:
             raise NotImplementedError("ALiBi is not yet supported.")
         else:
-            raise NotImplementedError(
-                "Standard attention is not yet supported.")
+            raise NotImplementedError("Standard attention is not yet supported.")
 
     def forward(
         self,
@@ -190,8 +186,7 @@ class FalconAttention(nn.Module):
             qkv, bias = self.query_key_value(hidden_states)
             if bias is not None:
                 qkv += bias
-            q, k, v = qkv.split([self.q_size, self.kv_size, self.kv_size],
-                                dim=-1)
+            q, k, v = qkv.split([self.q_size, self.kv_size, self.kv_size], dim=-1)
         if self.use_rotary:
             with self._attn_rope_timer:
                 q, k = self.rotary_emb(positions, q, k)
@@ -224,8 +219,9 @@ class FalconMLP(nn.Module):
             communication_metric_name=OperationMetrics.MLP_UP_PROJ_ALL_GATHER,
         )
         self.act = nn.GELU()
-        self.reduce_row_parallel_results = not (config.new_decoder_architecture
-                                                or config.parallel_attn)
+        self.reduce_row_parallel_results = not (
+            config.new_decoder_architecture or config.parallel_attn
+        )
         self.dense_4h_to_h = RowParallelLinear(
             4 * hidden_size,
             hidden_size,
@@ -235,7 +231,7 @@ class FalconMLP(nn.Module):
             skip_bias_add=True,
             reduce_results=self.reduce_row_parallel_results,
             linear_metric_name=OperationMetrics.MLP_DOWN_PROJ,
-            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE
+            communication_metric_name=OperationMetrics.MLP_DOWN_PROJ_ALL_REDUCE,
         )
         self._mlp_activation_timer = CudaTimer(OperationMetrics.MLP_ACTIVATION)
 
@@ -262,19 +258,19 @@ class FalconDecoderLayer(nn.Module):
 
         if config.new_decoder_architecture:
             # The layer norm before self-attention
-            self.ln_attn = LayerNorm(hidden_size,
-                                     eps=config.layer_norm_epsilon)
+            self.ln_attn = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
             # The layer norm before the MLP
             self.ln_mlp = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         else:
-            self.input_layernorm = LayerNorm(hidden_size,
-                                             eps=config.layer_norm_epsilon)
+            self.input_layernorm = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
             if not config.parallel_attn:
                 self.post_attention_layernorm = LayerNorm(
-                    hidden_size, eps=config.layer_norm_epsilon)
+                    hidden_size, eps=config.layer_norm_epsilon
+                )
 
-        self.reduce_row_parallel_results = not (config.new_decoder_architecture
-                                                or config.parallel_attn)
+        self.reduce_row_parallel_results = not (
+            config.new_decoder_architecture or config.parallel_attn
+        )
 
     def forward(
         self,
@@ -348,17 +344,19 @@ class FalconModel(nn.Module):
             )
 
         # Transformer blocks
-        self.h = nn.ModuleList([
-            FalconDecoderLayer(config)
-            for _ in range(config.num_hidden_layers //
-                           get_pipeline_model_parallel_world_size())
-        ])
+        self.h = nn.ModuleList(
+            [
+                FalconDecoderLayer(config)
+                for _ in range(
+                    config.num_hidden_layers // get_pipeline_model_parallel_world_size()
+                )
+            ]
+        )
 
         # Final Layer Norm
         self.ln_f = None
         if is_pipeline_last_stage():
-            self.ln_f = LayerNorm(self.embed_dim,
-                                  eps=config.layer_norm_epsilon)
+            self.ln_f = LayerNorm(self.embed_dim, eps=config.layer_norm_epsilon)
 
     def forward(
         self,
@@ -394,11 +392,13 @@ class FalconForCausalLM(nn.Module):
 
         self.lm_head = None
         if self.is_pipeline_last_stage:
-            self.lm_head = ColumnParallelLinear(config.hidden_size,
-                                                config.vocab_size,
-                                                bias=False,
-                                                gather_output=False,
-                                                perform_initialization=False)
+            self.lm_head = ColumnParallelLinear(
+                config.hidden_size,
+                config.vocab_size,
+                bias=False,
+                gather_output=False,
+                perform_initialization=False,
+            )
 
     def forward(
         self,
@@ -423,17 +423,21 @@ class FalconForCausalLM(nn.Module):
         return hidden_states
 
     _column_parallel_weights = [
-        "word_embeddings.weight", "lm_head.weight", "dense_h_to_4h.weight",
-        "dense_h_to_4h.bias"
+        "word_embeddings.weight",
+        "lm_head.weight",
+        "dense_h_to_4h.weight",
+        "dense_h_to_4h.bias",
     ]
     _row_parallel_weights = ["dense.weight", "dense_4h_to_h.weight"]
 
-    def load_weights(self,
-                     model_name_or_path: str,
-                     cache_dir: Optional[str] = None,
-                     load_format: str = "auto",
-                     revision: Optional[str] = None):
-        tp_size = (get_tensor_model_parallel_world_size())
+    def load_weights(
+        self,
+        model_name_or_path: str,
+        cache_dir: Optional[str] = None,
+        load_format: str = "auto",
+        revision: Optional[str] = None,
+    ):
+        tp_size = get_tensor_model_parallel_world_size()
         tp_rank = get_tensor_model_parallel_rank()
         pp_size = get_pipeline_model_parallel_world_size()
         pp_rank = get_pipeline_model_parallel_rank()
@@ -472,13 +476,13 @@ class FalconForCausalLM(nn.Module):
         state_dict = self.state_dict()
 
         for name, loaded_weight in hf_model_weights_iterator(
-                model_name_or_path, cache_dir, load_format, revision):
+            model_name_or_path, cache_dir, load_format, revision
+        ):
 
             if pp_rank != 0 and "word_embeddings" in name:
                 continue
 
-            if pp_rank != pp_size - 1 and ("lm_head" in name
-                                           or "ln_f" in name):
+            if pp_rank != pp_size - 1 and ("lm_head" in name or "ln_f" in name):
                 continue
 
             if "transformer.h" in name:
@@ -493,42 +497,51 @@ class FalconForCausalLM(nn.Module):
                 loaded_weight = convert_pyslice_to_tensor(loaded_weight)
                 loaded_weight_size = loaded_weight.size()
                 loaded_weight = loaded_weight.view(
-                    total_num_kv_heads, num_query_heads_per_kv_head + 2,
-                    head_size, *loaded_weight_size[1:])
+                    total_num_kv_heads,
+                    num_query_heads_per_kv_head + 2,
+                    head_size,
+                    *loaded_weight_size[1:],
+                )
 
                 wq = loaded_weight[:, :-2].reshape(-1, *loaded_weight_size[1:])
-                wk = loaded_weight[:, [-2]].reshape(-1,
-                                                    *loaded_weight_size[1:])
-                wv = loaded_weight[:, [-1]].reshape(-1,
-                                                    *loaded_weight_size[1:])
+                wk = loaded_weight[:, [-2]].reshape(-1, *loaded_weight_size[1:])
+                wv = loaded_weight[:, [-1]].reshape(-1, *loaded_weight_size[1:])
 
-                wq = wq[head_size * head_start:head_size * head_end]
-                wk = wk[head_size * kv_head_start:head_size * kv_head_end]
-                wv = wv[head_size * kv_head_start:head_size * kv_head_end]
+                wq = wq[head_size * head_start : head_size * head_end]
+                wk = wk[head_size * kv_head_start : head_size * kv_head_end]
+                wv = wv[head_size * kv_head_start : head_size * kv_head_end]
 
                 if separated_q_kv:
                     loaded_weight_q = wq
                     loaded_weight_kv = torch.cat([wk, wv], dim=0)
                     q_weight_name = name.replace("query_key_value", "query")
-                    kv_weight_name = name.replace("query_key_value",
-                                                  "key_value")
-                    load_tensor_parallel_weights(state_dict[q_weight_name],
-                                                 loaded_weight_q,
-                                                 q_weight_name,
-                                                 self._column_parallel_weights,
-                                                 self._row_parallel_weights,
-                                                 tp_rank)
-                    load_tensor_parallel_weights(state_dict[kv_weight_name],
-                                                 loaded_weight_kv,
-                                                 kv_weight_name,
-                                                 self._column_parallel_weights,
-                                                 self._row_parallel_weights,
-                                                 tp_rank)
+                    kv_weight_name = name.replace("query_key_value", "key_value")
+                    load_tensor_parallel_weights(
+                        state_dict[q_weight_name],
+                        loaded_weight_q,
+                        q_weight_name,
+                        self._column_parallel_weights,
+                        self._row_parallel_weights,
+                        tp_rank,
+                    )
+                    load_tensor_parallel_weights(
+                        state_dict[kv_weight_name],
+                        loaded_weight_kv,
+                        kv_weight_name,
+                        self._column_parallel_weights,
+                        self._row_parallel_weights,
+                        tp_rank,
+                    )
                     continue
                 else:
                     loaded_weight = torch.cat([wq, wk, wv], dim=0)
 
             param = state_dict[name]
-            load_tensor_parallel_weights(param, loaded_weight, name,
-                                         self._column_parallel_weights,
-                                         self._row_parallel_weights, tp_rank)
+            load_tensor_parallel_weights(
+                param,
+                loaded_weight,
+                name,
+                self._column_parallel_weights,
+                self._row_parallel_weights,
+                tp_rank,
+            )

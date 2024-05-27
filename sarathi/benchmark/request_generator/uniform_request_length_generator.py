@@ -1,9 +1,10 @@
-import random
 import math
+import random
 from typing import Tuple
 
 from sarathi.benchmark.request_generator.base_request_length_generator import (
-    BaseRequestLengthGenerator, )
+    BaseRequestLengthGenerator,
+)
 
 
 class UniformRequestLengthGenerator(BaseRequestLengthGenerator):
@@ -15,9 +16,12 @@ class UniformRequestLengthGenerator(BaseRequestLengthGenerator):
         )
 
         decode_tokens = math.ceil(
-            total_tokens /
-            (1 + self._config.
-             uniform_request_length_generator_prefill_to_decode_ratio))
+            total_tokens
+            / (
+                1
+                + self._config.uniform_request_length_generator_prefill_to_decode_ratio
+            )
+        )
         prefill_tokens = total_tokens - decode_tokens
         assert prefill_tokens > 0 and decode_tokens > 0
 
