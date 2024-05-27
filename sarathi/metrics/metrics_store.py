@@ -498,8 +498,7 @@ class MetricsStore(metaclass=Singleton):
         execution_time = batch_end_time - batch_start_time
 
         for seq_metadata in seq_metadata_list:
-            self._update_per_token_execution_times(batch_end_time,
-                                                   seq_metadata.seq)
+            self._update_per_token_execution_times(batch_end_time, seq_metadata.seq)
             if seq_metadata.seq.is_finished():
                 self._on_request_end(seq_metadata.seq)
 
