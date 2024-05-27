@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Union
 
 from sarathi.model_executor.attention.flashinfer_attention_wrapper import FlashinferAttentionWrapper
+from sarathi.model_executor.attention.flashinfer_unpaged_attention_wrapper import FlashinferUnpagedAttentionWrapper
 from sarathi.model_executor.attention.flash_attention_wrapper import FlashAttentionWrapper
 from sarathi.model_executor.attention.no_op_attention_wrapper import NoOpAttentionWrapper
 
@@ -9,6 +10,7 @@ from sarathi.model_executor.attention.no_op_attention_wrapper import NoOpAttenti
 class AttentionBackend(Enum):
     FLASHINFER = "FLASHINFER"
     FLASH_ATTENTION = "FLASH_ATTENTION"
+    FLASHINFER_UNPAGED = "FLASHINFER_UNPAGED"
     NO_OP = "NO_OP"
 
 
@@ -31,6 +33,8 @@ def set_attention_backend(backend: Union[str, AttentionBackend]):
 def get_attention_wrapper():
     if ATTENTION_BACKEND == AttentionBackend.FLASHINFER:
         return FlashinferAttentionWrapper.get_instance()
+    elif ATTENTION_BACKEND == AttentionBackend.FLASHINFER_UNPAGED:
+        return FlashinferUnpagedAttentionWrapper.get_instance()
     elif ATTENTION_BACKEND == AttentionBackend.FLASH_ATTENTION:
         return FlashAttentionWrapper.get_instance()
     elif ATTENTION_BACKEND == AttentionBackend.NO_OP:

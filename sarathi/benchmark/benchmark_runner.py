@@ -122,6 +122,8 @@ class BenchmarkRunner:
         sampling_params = SamplingParams(
             ignore_eos=True,
             max_tokens=request.num_decode_tokens,
+            temperature=0,
+            top_p=1.0,
         )
         prompt_token_ids = [1] * request.num_prefill_tokens
 

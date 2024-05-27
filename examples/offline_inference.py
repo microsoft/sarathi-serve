@@ -33,19 +33,18 @@ llm_engine = LLMEngine.from_engine_args(
     # model="tiiuae/falcon-40b",
     # model="tiiuae/falcon-180B",
     # model="codellama/CodeLlama-34b-Instruct-hf",
+    # scheduler config
+    max_num_seqs=128,
+    # scheduler_type="vllm",
+    # sarathi scheduler config
+    scheduler_type="sarathi",
+    chunk_size=100,
     # parallel config
-    tensor_parallel_size=1,
-    pipeline_parallel_size=4,
+    tensor_parallel_size=8,
+    pipeline_parallel_size=1,
     trust_remote_code=True,
     max_model_len=4096,
-    # scheduler config
-    scheduler_type="orca",
-    chunk_size=100,
-    max_num_seqs=4,
-    # metrics config
-    write_metrics=False,
-    output_dir=output_dir,
-    enable_chrome_trace=True,
+    attention_backend="FLASHINFER_UNPAGED"
 )
 
 

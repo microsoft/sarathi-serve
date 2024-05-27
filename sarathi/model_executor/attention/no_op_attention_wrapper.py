@@ -1,6 +1,7 @@
 import torch
 
 from typing import List, Optional, Tuple
+from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 
@@ -10,9 +11,8 @@ class NoOpAttentionWrapper(BaseAttentionWrapper):
 
     def init(
         self,
-        num_q_heads: int,
-        num_kv_heads: int,
-        head_dim: int,
+        model_config: ModelConfig,
+        parallel_config: ParallelConfig,
         block_size: int,
         device: torch.device,
     ):

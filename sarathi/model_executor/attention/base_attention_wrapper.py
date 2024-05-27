@@ -3,6 +3,7 @@ from typing import List, Optional, Union, Tuple
 
 import torch
 
+from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
@@ -13,16 +14,16 @@ class BaseAttentionWrapper(ABC):
 
     def init(
         self,
-        num_q_heads: int,
-        num_kv_heads: int,
-        head_dim: int,
+        model_config: ModelConfig,
+        parallel_config: ParallelConfig,
         block_size: int,
         device: torch.device,
     ):
         self.device = device
-        self.num_q_heads = num_q_heads
-        self.num_kv_heads = num_kv_heads
-        self.head_dim = head_dim
+        self.num_q_heads = model_config.get_num_q_heads(parallel_config)
+        self.num_kv_heads = model_config.get_num_kv_heads(parallel_config)
+        self.head_dim = model_config.get_head_size()
+        self.dtype = model_config.dtype
         self.block_size = block_size
         self._timers = {}
 

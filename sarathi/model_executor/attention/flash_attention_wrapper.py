@@ -3,6 +3,7 @@ import torch
 from vllm_flash_attn import flash_attn_with_kvcache
 from typing import List, Optional, Tuple
 
+from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
@@ -13,13 +14,12 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
 
     def init(
         self,
-        num_q_heads: int,
-        num_kv_heads: int,
-        head_dim: int,
+        model_config: ModelConfig,
+        parallel_config: ParallelConfig,
         block_size: int,
         device: torch.device,
     ):
-        super().init(num_q_heads, num_kv_heads, head_dim, block_size, device)
+        super().init(model_config, parallel_config, block_size, device)
 
         self.is_metadata_initialized = False
         self.is_profiling_iteration = False
