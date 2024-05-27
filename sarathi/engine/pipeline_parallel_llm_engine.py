@@ -15,6 +15,8 @@ from sarathi.engine.base_llm_engine import BaseLLMEngine
 
 logger = init_logger(__name__)
 
+SCHEDULER_LOOP_DELAY = 0.01
+
 
 @dataclass
 class ScheduleStageOutputs:
@@ -84,7 +86,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
     @exit_on_error
     def _scheduler_timer_loop(self) -> None:
         while True:
-            time.sleep(0.01)
+            time.sleep(SCHEDULER_LOOP_DELAY)
             self.schedule_event.set()
 
     def _get_worker_impl(self):

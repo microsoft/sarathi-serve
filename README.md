@@ -63,7 +63,7 @@ python setup.py install
 ### Install Sarathi-Serve
 
 ```sh
-pip install -e . --extra-index-url https://flashinfer.ai/whl/cu121/torch2.2/
+pip install -e . --extra-index-url https://flashinfer.ai/whl/cu121/torch2.3/
 ```
 
 ## Citation

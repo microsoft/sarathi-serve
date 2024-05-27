@@ -1,6 +1,6 @@
 import torch
 
-from flash_attn import flash_attn_with_kvcache
+from vllm_flash_attn import flash_attn_with_kvcache
 from typing import List, Optional, Tuple
 
 from sarathi.core.datatypes.sequence import SequenceMetadata

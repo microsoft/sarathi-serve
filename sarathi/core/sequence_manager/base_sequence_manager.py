@@ -37,7 +37,7 @@ class BaseSequenceManager(ABC):
     def _pause_seq(self, seq_id: int) -> None:
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]
-        assert seq.is_running()
+        assert seq.is_running(), f"seq_id: {seq_id}, status: {seq.get_status()}"
         seq.set_status(SequenceStatus.PAUSED)
 
     def _resume_seq(self, seq_id: int) -> None:
@@ -112,6 +112,14 @@ class BaseSequenceManager(ABC):
         for scheduled_seq_metadata, sampler_output in zip(
                 scheduler_outputs.scheduled_seq_metadata_list,
                 sampler_outputs):
+            seq = self.seq_map[scheduled_seq_metadata.seq_id]
+            if seq.is_waiting():
+                # seq is preempted
+                # this can happen with pipeline parallel -- if the system
+                # runs out of memory, it will preempt the last arrived request
+                # this request might still be executing when the next stage scheduling
+                # triggers the preemption
+                continue
             self._pause_seq(scheduled_seq_metadata.seq_id)
             self._process_seq_output(
                 scheduled_seq_metadata.seq_id,
