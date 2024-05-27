@@ -24,27 +24,20 @@ sampling_params = SamplingParams(temperature=0.8, top_p=0.95, max_tokens=100)
 output_dir = f"{BASE_OUTPUT_DIR}/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
 llm_engine = LLMEngine.from_engine_args(
-    # model="internlm/internlm-20b",
-    # model="mistralai/Mistral-7B-Instruct-v0.2",
-    # model="Qwen/Qwen-72B",
-    # model="01-ai/Yi-34B",
     model="meta-llama/Llama-2-7b-hf",
-    # model="meta-llama/Llama-2-70b-chat-hf",
-    # model="tiiuae/falcon-40b",
-    # model="tiiuae/falcon-180B",
-    # model="codellama/CodeLlama-34b-Instruct-hf",
-    # scheduler config
-    max_num_seqs=128,
-    # scheduler_type="vllm",
-    # sarathi scheduler config
-    scheduler_type="sarathi",
-    chunk_size=100,
     # parallel config
-    tensor_parallel_size=8,
-    pipeline_parallel_size=1,
+    tensor_parallel_size=4,
+    pipeline_parallel_size=2,
     trust_remote_code=True,
     max_model_len=4096,
-    attention_backend="FLASHINFER_UNPAGED"
+    # scheduler config
+    scheduler_type="sarathi",
+    chunk_size=100,
+    max_num_seqs=4,
+    # metrics config
+    write_metrics=False,
+    output_dir=output_dir,
+    enable_chrome_trace=True,
 )
 
 

@@ -159,6 +159,7 @@ class CapacitySearch:
         left = 0
         right = self.job_config.start_qps * 2
         qps = 0
+        last_qps = 0
         max_qps_under_sla = None
         min_qps_over_sla = 2**32
 
@@ -177,6 +178,13 @@ class CapacitySearch:
             qps = (left + right) / 2
             # round to 2 decimal places
             qps = round(qps, 2)
+
+            if qps == last_qps:
+                break
+
+            last_qps = qps
+
+            print(f"Searching between {left} and {right} - qps: {qps}", flush=True)
 
             is_under_sla, scheduling_delay, tbt, run_id = self.is_under_sla(
                 qps)
@@ -218,8 +226,8 @@ class CapacitySearch:
             return {}
 
         logger.info(
-            f"Max QPS under SLO for {self.job_config.get_human_readable_name()}: "
-            f"{max_qps_under_sla}, Scheduling delay: {scheduling_delay_at_max_qps}, TBT: {tbt_at_max_qps}",
+            f"Max QPS under SLO for {self.job_config.get_human_readable_name()} - "
+            f"QPS: {max_qps_under_sla}, Scheduling delay: {scheduling_delay_at_max_qps}, TBT: {tbt_at_max_qps}",
             flush=True,
         )
         best_run = wandb.Api().run(f"{self.args.wandb_project}/{best_run_id}")
