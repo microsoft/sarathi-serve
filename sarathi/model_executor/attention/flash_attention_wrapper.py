@@ -3,10 +3,13 @@ import torch
 from vllm_flash_attn import flash_attn_with_kvcache
 from typing import List, Optional, Tuple
 
+from sarathi.logger import init_logger
 from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
+
+logger = init_logger(__name__)
 
 
 class FlashAttentionWrapper(BaseAttentionWrapper):
@@ -211,17 +214,26 @@ class FlashAttentionWrapper(BaseAttentionWrapper):
                                      -1, 1, self.num_kv_heads, self.head_dim)
 
         with self.get_timer(OperationMetrics.ATTN_DECODE, layer_id):
-            decode_output = flash_attn_with_kvcache(
-                decode_query,
-                kv_cache[0],  # k_cache,
-                kv_cache[1],  # v_cache,
-                decode_key,
-                decode_value,
-                cache_seqlens=self.decode_cache_len,
-                block_table=self.decode_block_table,
-                softmax_scale=softmax_scale,
-                causal=True,
-            )
+            try:
+                decode_output = flash_attn_with_kvcache(
+                    decode_query,
+                    kv_cache[0],  # k_cache,
+                    kv_cache[1],  # v_cache,
+                    decode_key,
+                    decode_value,
+                    cache_seqlens=self.decode_cache_len,
+                    block_table=self.decode_block_table,
+                    softmax_scale=softmax_scale,
+                    causal=True,
+                )
+            except RuntimeError as e:
+                if "If key is supplied, it must have seqlen <= the seqlen of the KV cache" in str(e):
+                    logger.warning(
+                        "Ran into transient error with flash attention: Key length is greater than the cache length. Skipping the attention computation."
+                    )
+                    return output
+                else: 
+                    raise e
 
         with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):
             # flatten the seq_output and copy it to the output tensor

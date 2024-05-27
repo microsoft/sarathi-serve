@@ -159,6 +159,7 @@ class CapacitySearch:
         left = 0
         right = self.job_config.start_qps * 2
         qps = 0
+        last_qps = 0
         max_qps_under_sla = None
         min_qps_over_sla = 2**32
 
@@ -177,6 +178,13 @@ class CapacitySearch:
             qps = (left + right) / 2
             # round to 2 decimal places
             qps = round(qps, 2)
+
+            if qps == last_qps:
+                break
+
+            last_qps = qps
+
+            print(f"Searching between {left} and {right} - qps: {qps}", flush=True)
 
             is_under_sla, scheduling_delay, tbt, run_id = self.is_under_sla(
                 qps)
