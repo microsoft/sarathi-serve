@@ -11,7 +11,7 @@ Sarathi-Serve has been tested with CUDA 12.1 on A100 and A40 GPUs.
 ### Clone repository
 
 ```sh
-git clone https://msri@dev.azure.com/msri/AI-Infrastructure/_git/llm-batching
+git clone https://github.com/microsoft/sarathi-serve.git
 ```
 
 ### Create mamba environment
