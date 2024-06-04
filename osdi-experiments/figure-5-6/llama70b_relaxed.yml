@@ -1,0 +1,35 @@
+schedulers:
+  - name: vllm
+    scheduler: vllm
+    batch_size: 128
+  - name: orca
+    scheduler: orca
+    batch_size: 8 # with higher batch size activation and kv cache memory blows up
+  - name: sarathi_1536
+    scheduler: sarathi
+    chunk_size: 1536
+    batch_size: 128
+
+traces:
+  - name: chat
+    trace_file: "./data/processed_traces/sharegpt_8k_filtered_stats_llama2_tokenizer.csv"
+    max_seq_len: 8192
+    num_requests: 2048
+    start_qps: 1
+  - name: arxiv
+    trace_file: "./data/processed_traces/arxiv_summarization_filtered_stats_llama2_tokenizer.csv"
+    max_seq_len: 16384
+    num_requests: 2048
+    start_qps: 0.5
+
+parallel_spec:
+  - name: tp_4_pp_2
+    tp_dimension: 4
+    pp_dimension: 2
+
+models:
+  - name: llama2-70b
+    identifier: meta-llama/Llama-2-70b-hf
+    parallel_specs: ["tp_4_pp_2"]
+    scheduler_specs: null # usee all
+    traces: null # use all

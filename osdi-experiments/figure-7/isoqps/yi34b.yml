@@ -1,0 +1,36 @@
+schedulers:
+  - name: vllm_16
+    scheduler: vllm
+    batch_size: 16
+  - name: vllm_32
+    scheduler: vllm
+    batch_size: 32
+  - name: vllm_64
+    scheduler: vllm
+    batch_size: 64
+  - name: vllm_128
+    scheduler: vllm
+    batch_size: 128
+  - name: sarathi_2048
+    scheduler: sarathi
+    chunk_size: 2048
+    batch_size: 128
+
+traces:
+  - name: chat
+    trace_file: "./data/processed_traces/sharegpt_8k_filtered_stats_llama2_tokenizer.csv"
+    max_seq_len: 8192
+    num_requests: 1024
+    start_qps: 4 # this param is ignored in isoqps runs
+
+parallel_spec:
+  - name: tp_2
+    tp_dimension: 2
+    pp_dimension: 1
+
+models:
+  - name: yi-34b
+    identifier: 01-ai/Yi-34B
+    parallel_specs: ["tp_2"]
+    scheduler_specs: null # usee all
+    traces: null # use all
