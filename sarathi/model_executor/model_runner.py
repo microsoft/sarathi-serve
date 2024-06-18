@@ -3,19 +3,12 @@ from typing import List, Optional, Tuple
 import torch
 import torch.distributed
 
-from sarathi.config import (
-    BaseSchedulerConfig,
-    CacheConfig,
-    ModelConfig,
-    ParallelConfig,
-    SchedulerType,
-)
+from sarathi.config import SchedulerType, SystemConfig
 from sarathi.core.datatypes.sampling_params import SamplingParams
 from sarathi.core.datatypes.sequence import Sequence, SequenceMetadata
 from sarathi.logger import init_logger
-from sarathi.metrics.constants import CpuOperationMetrics, OperationMetrics
+from sarathi.metrics.constants import CpuOperationMetrics
 from sarathi.metrics.cpu_timer import CpuTimer
-from sarathi.metrics.cuda_timer import CudaTimer
 from sarathi.model_executor import get_model, set_random_seed
 from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.sampler import Sampler
@@ -30,24 +23,19 @@ class ModelRunner:
 
     def __init__(
         self,
-        model_config: ModelConfig,
-        parallel_config: ParallelConfig,
-        scheduler_config: BaseSchedulerConfig,
-        cache_config: CacheConfig,
+        config: SystemConfig,
         device: torch.device,
         rank: int,
     ):
-        self.model_config = model_config
-        self.parallel_config = parallel_config
-        self.scheduler_config = scheduler_config
+        self.config = config
         self.device = device
         self.rank = rank
 
-        self.model = get_model(self.model_config)
+        self.model = get_model(self.config.model_config)
         get_attention_wrapper().init(
-            self.model_config,
-            self.parallel_config,
-            cache_config.block_size,
+            config.model_config,
+            config.parallel_config,
+            config.cache_config.block_size,
             self.device,
         )
 
@@ -133,19 +121,23 @@ class ModelRunner:
         # Enable top-k sampling to reflect the accurate memory usage.
         vocab_size = self.model.config.vocab_size
         sampling_params = SamplingParams(top_p=0.99, top_k=vocab_size - 1)
-        max_num_batched_tokens = self.scheduler_config.max_num_batched_tokens
-        max_num_seqs = self.scheduler_config.max_num_seqs
+        max_num_batched_tokens = (
+            self.config.scheduler_config.get_max_num_batched_tokens(
+                self.config.model_config.max_model_len
+            )
+        )
+        max_num_seqs = self.config.scheduler_config.max_num_seqs
 
         seq_metadata_list: List[SequenceMetadata] = []
 
         if (
-            self.scheduler_config.type == SchedulerType.SARATHI
-            or self.scheduler_config.type == SchedulerType.SIMPLE_CHUNKING
+            self.config.scheduler_config.get_type() == SchedulerType.SARATHI
+            or self.config.scheduler_config.get_type() == SchedulerType.SIMPLE_CHUNKING
         ):
             # Profile memory usage with a single `chunk_size` chunk
             # which is the last chunk in the longest supported sequence.
-            chunk_size = self.scheduler_config.chunk_size
-            seq_len = self.model_config.get_max_model_len()
+            chunk_size = self.config.scheduler_config.chunk_size
+            seq_len = self.config.model_config.max_model_len
             chunk_size = min(chunk_size, seq_len)
             seq = Sequence(
                 seq_id=0,
@@ -190,7 +182,9 @@ class ModelRunner:
         get_attention_wrapper().begin_forward(seq_metadata_list)
 
         # Execute the model.
-        num_layers = self.model_config.get_num_layers(self.parallel_config)
+        num_layers = self.config.model_config.get_num_layers(
+            self.config.parallel_config
+        )
         self.model(
             hidden_states=input_tokens,
             positions=input_positions,
@@ -203,7 +197,7 @@ class ModelRunner:
         peak_memory = torch.cuda.max_memory_allocated()
         total_gpu_memory = get_gpu_memory()
         cache_block_size = CacheEngine.get_cache_block_size(
-            block_size, self.model_config, self.parallel_config
+            block_size, self.config.model_config, self.config.parallel_config
         )
         num_gpu_blocks = int(
             (total_gpu_memory * gpu_memory_utilization - peak_memory)
@@ -216,7 +210,7 @@ class ModelRunner:
 
         # Reset the seed to ensure that the random state is not affected by
         # the model initialization and profiling.
-        set_random_seed(self.model_config.seed)
+        set_random_seed(self.config.model_config.seed)
         return num_gpu_blocks
 
     def run(

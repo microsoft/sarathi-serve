@@ -1,13 +1,12 @@
 import time
 from typing import List
 
-from sarathi.config import CacheConfig, FasterTransformerSchedulerConfig
+from sarathi.config import CacheConfig, FasterTransformerSchedulerConfig, ModelConfig
 from sarathi.core.block_space_manager.faster_transformer_block_space_manager import (
     FasterTransformerBlockSpaceManager,
 )
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SequenceScheduleMetadata
-from sarathi.core.datatypes.sequence_status import SequenceStatus
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
 from sarathi.logger import init_logger
 
@@ -18,12 +17,11 @@ class FasterTransformerScheduler(BaseScheduler):
 
     def __init__(
         self,
+        model_config: ModelConfig,
         scheduler_config: FasterTransformerSchedulerConfig,
         cache_config: CacheConfig,
     ) -> None:
-        super().__init__(scheduler_config, cache_config)
-
-        self.prompt_limit = self.scheduler_config.max_model_len
+        super().__init__(model_config, scheduler_config, cache_config)
 
     def get_block_space_manager_class(self):
         return FasterTransformerBlockSpaceManager

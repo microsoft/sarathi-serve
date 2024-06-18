@@ -8,8 +8,8 @@ from sarathi.benchmark.capacity_search.ray_utils import (
     RayParallelRunner,
     ResourceManager,
 )
-from sarathi.benchmark.types import ReplicaResourceMapping
 from sarathi.logger import init_logger
+from sarathi.types import ReplicaResourceMapping
 
 logger = init_logger(__name__)
 
@@ -18,13 +18,13 @@ def run_search(
     job_config: JobConfig,
     args: argparse.Namespace,
     resource_manager: ResourceManager,
-    resource_mapping: ReplicaResourceMapping,
+    replica_resource_mapping: ReplicaResourceMapping,
 ):
     capacity_search = CapacitySearch(
         job_config,
         args,
         resource_manager,
-        resource_mapping,
+        replica_resource_mapping,
     )
     return capacity_search.search()
 
@@ -49,11 +49,13 @@ class SearchManager:
 
         ray_parallel_runner = RayParallelRunner()
 
-        remote_func = lambda resource_manager, resource_mapping, job_config: run_search(
-            job_config,
-            self.args,
-            resource_manager,
-            resource_mapping,
+        remote_func = (
+            lambda resource_manager, replica_resource_mapping, job_config: run_search(
+                job_config,
+                self.args,
+                resource_manager,
+                replica_resource_mapping,
+            )
         )
         all_results = ray_parallel_runner.map(
             remote_func,

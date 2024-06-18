@@ -7,13 +7,7 @@ from typing import Optional, Tuple
 import torch
 import torch.distributed
 
-from sarathi.config import (
-    BaseSchedulerConfig,
-    CacheConfig,
-    MetricsConfig,
-    ModelConfig,
-    ParallelConfig,
-)
+from sarathi.config import CacheConfig, ParallelConfig, SystemConfig
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence
 from sarathi.core.sequence_manager.worker_sequence_manager import WorkerSequenceManager
@@ -43,22 +37,14 @@ class BaseWorker:
 
     def __init__(
         self,
-        model_config: ModelConfig,
-        parallel_config: ParallelConfig,
-        scheduler_config: BaseSchedulerConfig,
-        cache_config: CacheConfig,
-        metrics_config: MetricsConfig,
+        config: SystemConfig,
         local_rank: int,
         rank: Optional[int] = None,
         distributed_init_method: Optional[str] = None,
     ) -> None:
-        self.model_config = model_config
-        self.parallel_config = parallel_config
-        self.scheduler_config = scheduler_config
-        # this is partially initialized cache config, ie. it doesn't have
+        # Not: the cache config is partially initialized at this point, ie. it doesn't have
         # information about the number of blocks, it will get updated after profiling
-        self.cache_config = cache_config
-        self.metrics_config = metrics_config
+        self.config = config
         self.local_rank = local_rank
         self.rank = rank
         self.distributed_init_method = distributed_init_method
@@ -70,13 +56,17 @@ class BaseWorker:
         # Sequence manager also needs number of blocks for initialization
         self.seq_manager = None
 
-        set_attention_backend(model_config.attention_backend)
+        set_attention_backend(config.worker_config.attention_backend)
 
         self._verify_parallel_config()
-        self.metrics_store = MetricsStore(metrics_config)
+        self.metrics_store = MetricsStore.get_or_create_instance(
+            config.replica_config,
+            config.model_config,
+            config.metrics_config,
+        )
 
     def _verify_parallel_config(self) -> None:
-        assert self.parallel_config.pipeline_parallel_size == 1
+        assert self.config.parallel_config.pipeline_parallel_size == 1
 
     @torch.inference_mode()
     @synchronized
@@ -98,7 +88,7 @@ class BaseWorker:
 
         # Initialize the distributed environment.
         _init_distributed_environment(
-            self.parallel_config, self.rank, self.distributed_init_method
+            self.config.parallel_config, self.rank, self.distributed_init_method
         )
 
         self.tensor_model_parallel_rank = get_tensor_model_parallel_rank()
@@ -108,7 +98,7 @@ class BaseWorker:
         self.is_first_pipeline_stage = self.pipeline_model_parallel_rank == 0
         self.is_last_pipeline_stage = (
             self.pipeline_model_parallel_rank
-            == self.parallel_config.pipeline_parallel_size - 1
+            == self.config.parallel_config.pipeline_parallel_size - 1
         )
 
         logger.info(
@@ -118,12 +108,9 @@ class BaseWorker:
         )
 
         # Initialize the model.
-        set_random_seed(self.model_config.seed)
+        set_random_seed(self.config.model_config.seed)
         self.model_runner = ModelRunner(
-            self.model_config,
-            self.parallel_config,
-            self.scheduler_config,
-            self.cache_config,
+            self.config,
             self.device,
             self.rank,
         )
@@ -134,16 +121,15 @@ class BaseWorker:
     def init_cache_engine(self, cache_config: CacheConfig) -> None:
         torch.cuda.set_device(self.device)
 
-        self.cache_config = cache_config
+        self.config.cache_config = cache_config
 
         self.cache_engine = CacheEngine(
-            self.cache_config, self.model_config, self.parallel_config
+            self.config,
         )
         self.gpu_cache = self.cache_engine.gpu_cache
 
         self.seq_manager = WorkerSequenceManager(
-            self.cache_config,
-            self.scheduler_config,
+            self.config,
         )
 
     @synchronized
@@ -224,7 +210,7 @@ class BaseWorker:
     def stop_profiling(self) -> None:
         self.profiler.__exit__(None, None, None)
         self.profiler.export_chrome_trace(
-            f"{self.metrics_config.output_dir}/profiler_trace_rank_{self.rank}.json"
+            f"{self.config.replica_config.output_dir}/profiler_trace_rank_{self.rank}.json"
         )
 
 

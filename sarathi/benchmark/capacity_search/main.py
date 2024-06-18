@@ -12,9 +12,9 @@ import json
 import os
 import time
 
-import wandb
 import yaml
 
+import wandb
 from sarathi.benchmark.capacity_search.search_manager import SearchManager
 from sarathi.logger import init_logger
 
@@ -70,11 +70,11 @@ if __name__ == "__main__":
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    logger.info("Starting capacity search", flush=True)
+    logger.info("Starting capacity search")
 
     # merge the config with the args
     config.update(vars(args))
-    logger.info(f"Config: {config}", flush=True)
+    logger.info(f"Config: {config}")
 
     # store the config and args
     json.dump(config, open(f"{args.output_dir}/config.json", "w"))
@@ -96,4 +96,4 @@ if __name__ == "__main__":
 
     end_time = time.time()
 
-    logger.info(f"Benchmarking took time: {end_time - start_time}", flush=True)
+    logger.info(f"Benchmarking took time: {end_time - start_time}")

@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 
-from sarathi.config import CacheConfig, SarathiSchedulerConfig
+from sarathi.config import CacheConfig, ModelConfig, SarathiSchedulerConfig
 from sarathi.core.block_space_manager.sarathi_block_space_manager import (
     SarathiBlockSpaceManager,
 )
@@ -19,12 +19,12 @@ class SarathiScheduler(BaseScheduler):
 
     def __init__(
         self,
+        model_config: ModelConfig,
         scheduler_config: SarathiSchedulerConfig,
         cache_config: CacheConfig,
     ) -> None:
-        super().__init__(scheduler_config, cache_config)
+        super().__init__(model_config, scheduler_config, cache_config)
 
-        self.prompt_limit = self.scheduler_config.max_model_len
         self.chunk_size = self.scheduler_config.chunk_size
         self.enable_dynamic_chunking_schedule = (
             self.scheduler_config.enable_dynamic_chunking_schedule

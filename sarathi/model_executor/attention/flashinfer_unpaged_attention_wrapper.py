@@ -36,7 +36,7 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
         for _ in range(num_layers):
             self.kv_buffers.append(
                 KVBuffer(
-                    model_config.get_max_model_len(),
+                    model_config.max_model_len,
                     self.num_kv_heads,
                     self.head_dim,
                     device,
