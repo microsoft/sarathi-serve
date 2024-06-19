@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
@@ -17,30 +17,30 @@ from sarathi.utils.threading_utils import synchronized
 class BaseSequenceManager(ABC):
 
     def __init__(self):
-        self.seq_map = {}
+        self.seq_map: Dict[str, Sequence] = {}
 
     @synchronized
     def add_seq(self, seq: Sequence) -> None:
         assert seq.seq_id not in self.seq_map
         self.seq_map[seq.seq_id] = seq
 
-    def _free_seq(self, seq_id: int) -> None:
+    def _free_seq(self, seq_id: str) -> None:
         assert seq_id in self.seq_map
         del self.seq_map[seq_id]
 
-    def _preempt_seq(self, seq_id: int) -> None:
+    def _preempt_seq(self, seq_id: str) -> None:
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]
         assert seq.is_executing()
         seq.reset_for_recompute()
 
-    def _pause_seq(self, seq_id: int) -> None:
+    def _pause_seq(self, seq_id: str) -> None:
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]
         assert seq.is_running(), f"seq_id: {seq_id}, status: {seq.get_status()}"
         seq.set_status(SequenceStatus.PAUSED)
 
-    def _resume_seq(self, seq_id: int) -> None:
+    def _resume_seq(self, seq_id: str) -> None:
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]
         assert seq.is_waiting() or seq.is_paused()
@@ -88,7 +88,7 @@ class BaseSequenceManager(ABC):
         pass
 
     def _process_seq_output(
-        self, seq_id: int, sample: SamplerOutput, prompt_chunk_len: int
+        self, seq_id: str, sample: SamplerOutput, prompt_chunk_len: int
     ) -> None:
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]

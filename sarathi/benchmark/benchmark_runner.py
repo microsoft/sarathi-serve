@@ -8,10 +8,11 @@ from tqdm import tqdm
 
 import wandb
 from sarathi import LLMEngine, SamplingParams
+from sarathi.benchmark.config import BenchmarkConfig
 from sarathi.benchmark.entities import Request
 from sarathi.benchmark.request_generator import RequestGeneratorRegistry
 from sarathi.benchmark.utils.random import set_seeds
-from sarathi.config import BenchmarkConfig, ReplicaConfig
+from sarathi.config import ReplicaConfig
 from sarathi.metrics.metrics_store import MetricsStore
 from sarathi.types import ReplicaResourceMapping, ResourceMapping
 from sarathi.utils import get_ip

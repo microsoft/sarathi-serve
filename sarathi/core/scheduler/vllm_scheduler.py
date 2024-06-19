@@ -35,8 +35,8 @@ class VLLMScheduler(BaseScheduler):
         # Fix the current time.
         now = time.monotonic()
 
-        ignored_seq_ids: List[int] = []
-        preempted_seq_ids: List[int] = []
+        ignored_seq_ids: List[str] = []
+        preempted_seq_ids: List[str] = []
         scheduled_seq_metadata_list: List[SequenceScheduleMetadata] = []
 
         # The total number of sequences on the fly, including the

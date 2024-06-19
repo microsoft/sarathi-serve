@@ -163,7 +163,7 @@ class ModelRunner:
                 )
 
                 seq = Sequence(
-                    seq_id=seq_id,
+                    seq_id=str(seq_id),
                     prompt=None,
                     prompt_token_ids=[0] * seq_len,
                     block_size=block_size,

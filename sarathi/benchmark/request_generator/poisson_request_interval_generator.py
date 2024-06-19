@@ -1,10 +1,10 @@
 import math
 import random
 
+from sarathi.benchmark.config import PoissonRequestIntervalGeneratorConfig
 from sarathi.benchmark.request_generator.base_request_interval_generator import (
     BaseRequestIntervalGenerator,
 )
-from sarathi.config import PoissonRequestIntervalGeneratorConfig
 
 
 class PoissonRequestIntervalGenerator(BaseRequestIntervalGenerator):

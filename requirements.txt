@@ -20,3 +20,5 @@ tiktoken
 grpcio
 tqdm
 vllm-flash-attn
+uvicorn
+fastapi

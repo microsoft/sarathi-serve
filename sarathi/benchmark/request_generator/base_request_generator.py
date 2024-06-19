@@ -2,8 +2,8 @@ import json
 from abc import ABC, abstractmethod
 from typing import List
 
+from sarathi.benchmark.config import BaseRequestGeneratorConfig
 from sarathi.benchmark.entities import Request
-from sarathi.config import BaseRequestGeneratorConfig
 
 
 class BaseRequestGenerator(ABC):

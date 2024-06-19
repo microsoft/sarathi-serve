@@ -204,7 +204,7 @@ class SequenceScheduleMetadata:
 
     def __init__(
         self,
-        seq_id: int,
+        seq_id: str,
         prompt_chunk_len: int,
     ) -> None:
         self.seq_id = seq_id
@@ -308,7 +308,7 @@ class SamplerOutput:
 
     def __init__(
         self,
-        seq_id: int,
+        seq_id: str,
         output_token: int,
     ) -> None:
         self.seq_id = seq_id

@@ -1,9 +1,9 @@
 from scipy.stats import gamma
 
+from sarathi.benchmark.config import GammaRequestIntervalGeneratorConfig
 from sarathi.benchmark.request_generator.base_request_interval_generator import (
     BaseRequestIntervalGenerator,
 )
-from sarathi.config import GammaRequestIntervalGeneratorConfig
 
 
 class GammaRequestIntervalGenerator(BaseRequestIntervalGenerator):

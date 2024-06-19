@@ -33,11 +33,11 @@ class KVBuffer:
             dtype=self.dtype,
             device=self.device,
         )
-        self.buffer_indices: Dict[int, int] = {}
-        self.buffer_active_lens: Dict[int, int] = {}
+        self.buffer_indices: Dict[str, int] = {}
+        self.buffer_active_lens: Dict[str, int] = {}
         self.buffer_offset: int = 0
 
-    def add_request(self, seq_id: int) -> None:
+    def add_request(self, seq_id: str) -> None:
         assert seq_id not in self.buffer_indices
         assert seq_id not in self.buffer_active_lens
         # we only support two requests at a time -- no more is required
@@ -48,13 +48,13 @@ class KVBuffer:
             self.buffer_indices[seq_id] = self.max_seq_len
         self.buffer_active_lens[seq_id] = 0
 
-    def free_request(self, seq_id: int) -> None:
+    def free_request(self, seq_id: str) -> None:
         assert seq_id in self.buffer_indices
         assert seq_id in self.buffer_active_lens
         del self.buffer_indices[seq_id]
         del self.buffer_active_lens[seq_id]
 
-    def get_kv_tensors(self, seq_id: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_kv_tensors(self, seq_id: str) -> Tuple[torch.Tensor, torch.Tensor]:
         assert seq_id in self.buffer_indices
         assert seq_id in self.buffer_active_lens
         start_offset = self.buffer_indices[seq_id]
@@ -64,7 +64,7 @@ class KVBuffer:
             self.v_buffer[start_offset:end_offset],
         )
 
-    def append(self, seq_id: int, key: torch.Tensor, value: torch.Tensor) -> None:
+    def append(self, seq_id: str, key: torch.Tensor, value: torch.Tensor) -> None:
         assert key.shape == value.shape
         active_length = self.buffer_active_lens[seq_id]
         assert active_length + key.shape[0] <= self.max_seq_len
@@ -79,5 +79,5 @@ class KVBuffer:
         self.buffer_indices = {}
         self.buffer_active_lens = {}
 
-    def has_seq_id(self, seq_id: int) -> bool:
+    def has_seq_id(self, seq_id: str) -> bool:
         return seq_id in self.buffer_indices
