@@ -6,7 +6,7 @@ dependencies:
   - setuptools
   - pip
   - make
-  - black
-  - isort
-  - flake8
-  - autopep8
+  - black=24.4.2
+  - isort=5.13.2
+  - flake8=7.1.0
+  - autopep8=2.3.0
