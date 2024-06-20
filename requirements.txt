@@ -14,11 +14,11 @@ wandb
 kaleido
 ddsketch
 jupyterlab
-flashinfer
+flashinfer >= 0.0.5
 pillow
 tiktoken
 grpcio
-tqdm
-vllm-flash-attn
 uvicorn
 fastapi
+openai
+tqdm

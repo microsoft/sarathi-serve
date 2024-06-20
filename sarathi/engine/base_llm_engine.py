@@ -219,7 +219,7 @@ class BaseLLMEngine:
         )
         if num_gpu_blocks < max_blocks_per_request:
             raise ValueError(
-                f"Not enough available memory to schedule a request will maximum allowed length {self.model_config.max_model_len}. "
+                f"Not enough available memory to schedule a request will maximum allowed length {self.config.model_config.max_model_len}. "
                 f"Need {max_blocks_per_request}, available {num_gpu_blocks} gpu blocks. "
                 f"Try decreasing `max_batch_size`, `max_model_len`."
             )

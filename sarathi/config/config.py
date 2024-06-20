@@ -167,7 +167,7 @@ class ParallelConfig:
     """
 
     pipeline_parallel_size: int = 1
-    tensor_parallel_size: int = 1
+    tensor_parallel_size: int = 8
 
     def __post_init__(self):
         self.world_size = self.pipeline_parallel_size * self.tensor_parallel_size
@@ -298,8 +298,8 @@ class ReplicaConfig:
 
 @dataclass
 class WorkerConfig:
-    gpu_memory_utilization: float = 0.9
-    attention_backend: AttentionBackend = AttentionBackend.FLASH_ATTENTION
+    gpu_memory_utilization: float = 0.8
+    attention_backend: AttentionBackend = AttentionBackend.FLASHINFER
 
     def __post_init__(self):
         self._verify_args()
