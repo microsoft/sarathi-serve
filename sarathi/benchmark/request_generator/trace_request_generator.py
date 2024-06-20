@@ -3,11 +3,11 @@ from typing import List
 
 import pandas as pd
 
+from sarathi.benchmark.config import TraceRequestGeneratorConfig
 from sarathi.benchmark.entities import Request
 from sarathi.benchmark.request_generator.base_request_generator import (
     BaseRequestGenerator,
 )
-from sarathi.config import TraceRequestGeneratorConfig
 
 logger = logging.getLogger(__name__)
 

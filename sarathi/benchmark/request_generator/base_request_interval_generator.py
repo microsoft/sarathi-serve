@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from sarathi.config import BaseRequestIntervalGeneratorConfig
+from sarathi.benchmark.config import BaseRequestIntervalGeneratorConfig
 
 
 class BaseRequestIntervalGenerator(ABC):

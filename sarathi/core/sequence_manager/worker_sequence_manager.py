@@ -25,7 +25,7 @@ class WorkerSequenceManager(BaseSequenceManager):
             config.model_config.max_model_len,
         )
 
-    def _free_seq(self, seq_id: int) -> None:
+    def _free_seq(self, seq_id: str) -> None:
         # ignored sequences might not have been allocated
         assert seq_id in self.seq_map
         seq = self.seq_map[seq_id]
@@ -33,7 +33,7 @@ class WorkerSequenceManager(BaseSequenceManager):
             self.block_manager.free(seq)
         super()._free_seq(seq_id)
 
-    def _preempt_seq(self, seq_id: int) -> None:
+    def _preempt_seq(self, seq_id: str) -> None:
         super()._preempt_seq(seq_id)
         seq = self.seq_map[seq_id]
         self.block_manager.free(seq)

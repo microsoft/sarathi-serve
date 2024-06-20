@@ -1,5 +1,6 @@
 from typing import List
 
+from sarathi.benchmark.config import SyntheticRequestGeneratorConfig
 from sarathi.benchmark.entities import Request
 from sarathi.benchmark.request_generator.base_request_generator import (
     BaseRequestGenerator,
@@ -11,7 +12,6 @@ from sarathi.benchmark.request_generator.request_length_generator_registry impor
     RequestLengthGeneratorRegistry,
 )
 from sarathi.benchmark.utils.random import set_seeds
-from sarathi.config import SyntheticRequestGeneratorConfig
 
 
 class SyntheticRequestGenerator(BaseRequestGenerator):

@@ -52,7 +52,7 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
         self.kv_last_page_len_tensor: torch.Tensor = None
         self.layer_index: int = 0
         self.decode_batch_size: int = 0
-        self.prompt_seq_ids: List[int] = []
+        self.prompt_seq_ids: List[str] = []
         self.prompt_chunk_lens: List[int] = []
         self.processed_prompt_lens: List[int] = []
         self.total_prompt_lens: List[int] = []
@@ -97,7 +97,7 @@ class FlashinferUnpagedAttentionWrapper(BaseAttentionWrapper):
         # qo_indptr: [0, prompt_0, prompt_0 + prompt_1, ..., prompt_0 + ... + prompt_N-1, generation_0, generation_0 + 1, ..., generation_0 + ... + M]
         qo_indptr: List[int] = [0]
 
-        prompt_seq_ids: List[int] = []
+        prompt_seq_ids: List[str] = []
         prompt_chunk_lens: List[int] = []
         processed_prompt_lens: List[int] = []
         total_prompt_lens: List[int] = []

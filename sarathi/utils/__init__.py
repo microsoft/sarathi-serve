@@ -1,12 +1,15 @@
-import enum
+import asyncio
 import os
 import socket
+import sys
 import uuid
 from platform import uname
-from typing import List
+from typing import AsyncIterator, List, Tuple, TypeVar, Union
 
 import psutil
 import torch
+
+T = TypeVar("T")
 
 
 class Counter:
@@ -71,3 +74,47 @@ def get_random_port() -> int:
         port = int(random_uuid(), 16) % (65536 - 8000) + 8000
 
     return port
+
+
+def merge_async_iterators(*iterators: AsyncIterator[T]) -> AsyncIterator[Tuple[int, T]]:
+    """Merge multiple asynchronous iterators into a single iterator.
+
+    This method handle the case where some iterators finish before others.
+    When it yields, it yields a tuple (i, item) where i is the index of the
+    iterator that yields the item.
+    """
+    queue: asyncio.Queue[Union[Tuple[int, T], Exception]] = asyncio.Queue()
+
+    finished = [False] * len(iterators)
+
+    async def producer(i: int, iterator: AsyncIterator[T]):
+        try:
+            async for item in iterator:
+                await queue.put((i, item))
+        except Exception as e:
+            await queue.put(e)
+        finished[i] = True
+
+    _tasks = [
+        asyncio.create_task(producer(i, iterator))
+        for i, iterator in enumerate(iterators)
+    ]
+
+    async def consumer():
+        try:
+            while not all(finished) or not queue.empty():
+                item = await queue.get()
+                if isinstance(item, Exception):
+                    raise item
+                yield item
+        except (Exception, asyncio.CancelledError) as e:
+            for task in _tasks:
+                if sys.version_info >= (3, 9):
+                    # msg parameter only supported in Python 3.9+
+                    task.cancel(e)
+                else:
+                    task.cancel()
+            raise e
+        await asyncio.gather(*_tasks)
+
+    return consumer()

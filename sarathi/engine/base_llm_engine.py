@@ -4,7 +4,7 @@ import time
 from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
-from sarathi.config import SystemConfig
+from sarathi.config import ModelConfig, SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.sampling_params import SamplingParams
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
@@ -268,12 +268,16 @@ class BaseLLMEngine:
         )
         return all_request_outputs
 
+    def get_model_config(self) -> ModelConfig:
+        return self.config.model_config
+
     def add_request(
         self,
         prompt: Optional[str],
         sampling_params: SamplingParams,
         prompt_token_ids: Optional[List[int]] = None,
         arrival_time: Optional[float] = None,
+        seq_id: Optional[str] = None,
     ) -> None:
         """Add a request to the engine's request pool.
 
@@ -294,6 +298,9 @@ class BaseLLMEngine:
         if arrival_time is None:
             arrival_time = time.monotonic()
 
+        if not seq_id:
+            seq_id = str(next(self.seq_counter))
+
         if prompt_token_ids is None:
             assert prompt is not None
             prompt_token_ids = self.tokenizer.encode(prompt)
@@ -301,7 +308,7 @@ class BaseLLMEngine:
         # Create the sequences.
         block_size = self.config.cache_config.block_size
         eos_token_id = self.tokenizer.eos_token_id
-        seq_id = next(self.seq_counter)
+
         seq = Sequence(
             seq_id,
             prompt,

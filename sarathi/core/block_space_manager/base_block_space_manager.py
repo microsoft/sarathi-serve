@@ -66,7 +66,7 @@ class BaseBlockSpaceManager(ABC):
         self.watermark_blocks = int(watermark * num_gpu_blocks)
         self.gpu_allocator = BlockAllocator(block_size, num_gpu_blocks)
         # Mapping: seq_id -> BlockTable.
-        self.block_tables: Dict[int, BlockTable] = {}
+        self.block_tables: Dict[str, BlockTable] = {}
 
     @abstractmethod
     def get_num_initial_blocks(self, seq: Sequence) -> int:
