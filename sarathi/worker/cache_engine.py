@@ -4,7 +4,7 @@ from typing import List, Tuple, Union
 
 import torch
 
-from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
+from sarathi.config import ModelConfig, ParallelConfig, SystemConfig
 from sarathi.logger import init_logger
 from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.utils import in_wsl
@@ -22,21 +22,15 @@ class CacheEngine:
 
     def __init__(
         self,
-        cache_config: CacheConfig,
-        model_config: ModelConfig,
-        parallel_config: ParallelConfig,
+        config: SystemConfig,
     ) -> None:
-        self.cache_config = cache_config
-        self.model_config = model_config
-        self.parallel_config = parallel_config
+        self.head_size = config.model_config.get_head_size()
+        self.num_layers = config.model_config.get_num_layers(config.parallel_config)
+        self.num_heads = config.model_config.get_num_kv_heads(config.parallel_config)
+        self.dtype = config.model_config.dtype
 
-        self.head_size = model_config.get_head_size()
-        self.num_layers = model_config.get_num_layers(parallel_config)
-        self.num_heads = model_config.get_num_kv_heads(parallel_config)
-        self.dtype = model_config.dtype
-
-        self.block_size = cache_config.block_size
-        self.num_gpu_blocks = cache_config.num_gpu_blocks
+        self.block_size = config.cache_config.block_size
+        self.num_gpu_blocks = config.cache_config.num_gpu_blocks
 
         # Initialize the cache.
         self.gpu_cache = self.allocate_gpu_cache()

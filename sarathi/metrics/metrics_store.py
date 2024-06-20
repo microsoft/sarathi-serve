@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import plotly.express as px
 import torch
-import wandb
 
-from sarathi.config import MetricsConfig
+import wandb
+from sarathi.config import MetricsConfig, ModelConfig, ReplicaConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import Sequence, SequenceMetadata
@@ -29,7 +29,6 @@ from sarathi.metrics.constants import (
     TokenMetricsTimeList,
 )
 from sarathi.metrics.data_series import DataSeries
-from sarathi.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
 def if_write_metrics(func):
 
     def wrapper(self, *args, **kwargs):
-        if self.should_write_metrics and self.initial_memory_profiling_done:
+        if self.config.write_metrics and self.initial_memory_profiling_done:
             return func(self, *args, **kwargs)
 
     return wrapper
@@ -63,9 +62,14 @@ TIME_STR_MS = "Time (ms)"
 OPERATION_STR = "Operation"
 
 
-class MetricsStore(metaclass=Singleton):
+class MetricsStore:
 
-    def __init__(self, metrics_config: MetricsConfig):
+    def __init__(
+        self,
+        replica_config: ReplicaConfig,
+        model_config: ModelConfig,
+        metrics_config: MetricsConfig,
+    ):
         self.disabled = False
 
         if not metrics_config or not metrics_config.write_metrics:
@@ -73,28 +77,28 @@ class MetricsStore(metaclass=Singleton):
             self.disabled = True
             return
 
-        self._config = metrics_config
+        self.config = metrics_config
+        self.replica_id = replica_config.replica_id
+        self.output_dir = replica_config.output_dir
         self.initial_memory_profiling_done = False
-        self.should_write_metrics = metrics_config.write_metrics
-        self._output_dir = metrics_config.output_dir
-
-        self._wandb_project = metrics_config.wandb_project
-        self._wandb_group = metrics_config.wandb_group
-        self._wandb_run_name = metrics_config.wandb_run_name
-        self._wandb_sweep_id = metrics_config.wandb_sweep_id
-        self._wandb_run_id = metrics_config.wandb_run_id
-
-        self._enable_op_level_metrics = metrics_config.enable_op_level_metrics
-        self._enable_cpu_op_level_metrics = metrics_config.enable_cpu_op_level_metrics
-        self._enable_chrome_trace = metrics_config.enable_chrome_trace
-        self._enable_request_outputs = metrics_config.enable_request_outputs
-        self._keep_individual_batch_metrics = (
-            metrics_config.keep_individual_batch_metrics
-        )
-        self._model_num_layers = metrics_config.model_num_layers
+        self.model_num_layers = model_config.get_total_num_layers()
 
         self.reset()
         self._init_wandb()
+
+    @classmethod
+    def get_or_create_instance(
+        cls,
+        replica_config: ReplicaConfig,
+        model_config: ModelConfig,
+        metrics_config: MetricsConfig,
+    ):
+        cls._instance = cls(replica_config, model_config, metrics_config)
+        return cls._instance
+
+    @classmethod
+    def get_instance(cls):
+        return cls._instance
 
     def is_op_enabled(
         self,
@@ -106,9 +110,9 @@ class MetricsStore(metaclass=Singleton):
             return False
 
         if metric_name in self.operation_metrics:
-            return self._enable_op_level_metrics and layer_id == PROFILE_LAYER_ID
+            return self.config.enable_op_level_metrics and layer_id == PROFILE_LAYER_ID
         elif metric_name in self.cpu_operation_metrics:
-            if not self._enable_cpu_op_level_metrics:
+            if not self.config.enable_cpu_op_level_metrics:
                 return False
             if metric_name in [
                 CpuOperationMetrics.SCHEDULE,
@@ -125,6 +129,9 @@ class MetricsStore(metaclass=Singleton):
         raise ValueError(f"Unknown metric name: {metric_name}")
 
     def reset(self):
+        if self.disabled:
+            return
+
         # Initialise request metrics
         self.seq_metrics_time_distributions: Dict[
             SequenceMetricsTimeDistributions, DataSeries
@@ -160,7 +167,7 @@ class MetricsStore(metaclass=Singleton):
             )
 
         # to measure the time interval between the last request and the next request
-        self._last_request_arrived_at = None
+        self.last_request_arrived_at = None
 
         # Initialise batch metrics
         self.batch_metrics_count_distribution: Dict[
@@ -172,7 +179,7 @@ class MetricsStore(metaclass=Singleton):
                     BATCH_ID_STR,
                     metric_name.value,
                 )
-                if self._keep_individual_batch_metrics
+                if self.config.keep_individual_batch_metrics
                 else CDFSketch(
                     metric_name.value,
                 )
@@ -187,15 +194,15 @@ class MetricsStore(metaclass=Singleton):
                     BATCH_ID_STR,
                     metric_name.value,
                 )
-                if self._keep_individual_batch_metrics
+                if self.config.keep_individual_batch_metrics
                 else CDFSketch(
                     metric_name.value,
                 )
             )
 
         # to measure the time wasted between the last batch and the next batch
-        self._last_batch_end_time = None
-        self._next_batch_id = 0
+        self.last_batch_end_time = None
+        self.next_batch_id = 0
 
         # Initialise completion metrics
         self.completion_metrics_time_series: Dict[
@@ -231,7 +238,7 @@ class MetricsStore(metaclass=Singleton):
                     BATCH_ID_STR,
                     metric_name.value,
                 )
-                if self._keep_individual_batch_metrics
+                if self.config.keep_individual_batch_metrics
                 else CDFSketch(
                     metric_name.value,
                 )
@@ -242,28 +249,28 @@ class MetricsStore(metaclass=Singleton):
 
     def _init_wandb(self):
         if (
-            not self.should_write_metrics
-            or not self._wandb_project
-            or not self._wandb_group
+            not self.config.write_metrics
+            or not self.config.wandb_project
+            or not self.config.wandb_group
         ):
             return
 
         logger.info(
-            f"Initializing wandb with project: {self._wandb_project}, group: {self._wandb_group}, run_name: {self._wandb_run_name}"
-            f", sweep_id: {self._wandb_sweep_id}, run_id: {self._wandb_run_id}"
+            f"Initializing wandb with project: {self.config.wandb_project}, group: {self.config.wandb_group}, run_name: {self.config.wandb_run_name}"
+            f", sweep_id: {self.config.wandb_sweep_id}, run_id: {self.config.wandb_run_id}"
         )
-        if self._wandb_sweep_id or self._wandb_run_id:
+        if self.config.wandb_sweep_id or self.config.wandb_run_id:
             logger.warn("wandb_sweep_id and wandb_run_id are not supported yet.")
 
         wandb.init(
-            project=self._wandb_project,
-            group=self._wandb_group,
-            name=self._wandb_run_name,
+            project=self.config.wandb_project,
+            group=self.config.wandb_group,
+            name=self.config.wandb_run_name,
         )
 
     @check_enabled
     def get_config_for_worker(self):
-        config = deepcopy(self._config)
+        config = deepcopy(self.config)
         config.wandb_project = None
         config.wandb_group = None
 
@@ -274,7 +281,7 @@ class MetricsStore(metaclass=Singleton):
         self.initial_memory_profiling_done = True
 
     def _get_seq_id(self, seq_id: str) -> str:
-        return f"{self._config.replica_id}_{seq_id}"
+        return f"{self.replica_id}_{seq_id}"
 
     @check_enabled
     @if_write_metrics
@@ -282,14 +289,14 @@ class MetricsStore(metaclass=Singleton):
         self.completion_metrics_time_series[
             CompletionMetricsTimeSeries.REQUEST_ARRIVAL
         ].put(seq.state.arrived_at, 1)
-        if self._last_request_arrived_at is not None:
+        if self.last_request_arrived_at is not None:
             self.seq_metrics_histogram[
                 SequenceMetricsHistogram.REQUEST_INTER_ARRIVAL_DELAY
             ].put(
                 self._get_seq_id(seq.seq_id),
-                seq.state.arrived_at - self._last_request_arrived_at,
+                seq.state.arrived_at - self.last_request_arrived_at,
             )
-        self._last_request_arrived_at = seq.state.arrived_at
+        self.last_request_arrived_at = seq.state.arrived_at
 
     @if_write_metrics
     def _on_request_end(self, seq: Sequence) -> None:
@@ -308,7 +315,7 @@ class MetricsStore(metaclass=Singleton):
             # do not log metrics for ignored requests, they can skew the results
             return
 
-        if self._enable_request_outputs:
+        if self.config.enable_request_outputs:
             self.requests_outputs.append(RequestOutput.from_seq(seq))
 
         # first log all the histograms
@@ -424,7 +431,7 @@ class MetricsStore(metaclass=Singleton):
             seq.state.last_token_generation_time,
         )
 
-        if self._keep_individual_batch_metrics:
+        if self.config.keep_individual_batch_metrics:
             self.completion_metrics_time_series[
                 CompletionMetricsTimeSeries.DECODE_COMPLETIONS
             ].put(batch_end_time, 1)
@@ -443,7 +450,7 @@ class MetricsStore(metaclass=Singleton):
         start_time: float,
         end_time: float,
     ) -> None:
-        if not self._enable_chrome_trace:
+        if not self.config.enable_chrome_trace:
             return
 
         trace = self._to_chrome_trace_dict(
@@ -469,8 +476,10 @@ class MetricsStore(metaclass=Singleton):
         end_time: float,
     ) -> None:
         self._process_individual_batch_metrics()
-        self._next_batch_id = scheduler_outputs.id + 1
-        if not self._enable_chrome_trace or len(seq_metadata_list) == 0:
+
+        self.next_batch_id = scheduler_outputs.id + 1
+
+        if not self.config.enable_chrome_trace or len(seq_metadata_list) == 0:
             return
 
         trace = self._to_chrome_trace_dict(
@@ -494,7 +503,7 @@ class MetricsStore(metaclass=Singleton):
         batch_end_time: float,
     ) -> None:
         self._process_individual_batch_metrics()
-        self._next_batch_id = scheduler_outputs.id + 1
+        self.next_batch_id = scheduler_outputs.id + 1
         execution_time = batch_end_time - batch_start_time
 
         for seq_metadata in seq_metadata_list:
@@ -502,14 +511,14 @@ class MetricsStore(metaclass=Singleton):
             if seq_metadata.seq.is_finished():
                 self._on_request_end(seq_metadata.seq)
 
-        if self._last_batch_end_time is not None:
+        if self.last_batch_end_time is not None:
             self.batch_metrics_time_distribution[
                 BatchMetricsTimeDistribution.INTER_BATCH_DELAY
             ].put_pair(
                 scheduler_outputs.id,
-                batch_start_time - self._last_batch_end_time,
+                batch_start_time - self.last_batch_end_time,
             )
-        self._last_batch_end_time = batch_end_time
+        self.last_batch_end_time = batch_end_time
 
         self.batch_metrics_count_distribution[
             BatchMetricsCountDistribution.BATCH_NUM_TOKENS
@@ -566,7 +575,7 @@ class MetricsStore(metaclass=Singleton):
             "ph": "X",
             "ts": start_time * 1e6,
             "dur": (end_time - start_time) * 1e6,
-            "pid": self._config.replica_id,
+            "pid": self.replica_id,
             "tid": pipeline_parallel_rank,
             "args": {
                 "batch_size": len(seq_metadata_list),
@@ -598,9 +607,9 @@ class MetricsStore(metaclass=Singleton):
         start_event: torch.cuda.Event,
         end_event: torch.cuda.Event,
     ):
-        if not self._enable_op_level_metrics:
+        if not self.config.enable_op_level_metrics:
             return
-        if self._keep_individual_batch_metrics:
+        if self.config.keep_individual_batch_metrics:
             self.operation_metrics_per_batch_events[metrics_name].append(
                 [start_event, end_event]
             )
@@ -612,13 +621,11 @@ class MetricsStore(metaclass=Singleton):
         metrics_name: OperationMetrics,
         time: float,
     ):
-        if not self._enable_op_level_metrics:
+        if not self.config.enable_op_level_metrics:
             return
         self.operation_metrics[metrics_name].put(time)
-        if self._keep_individual_batch_metrics:
-            self.operation_metrics_per_batch[metrics_name].put(
-                self._next_batch_id, time
-            )
+        if self.config.keep_individual_batch_metrics:
+            self.operation_metrics_per_batch[metrics_name].put(self.next_batch_id, time)
 
     @check_enabled
     @if_write_metrics
@@ -627,9 +634,9 @@ class MetricsStore(metaclass=Singleton):
         metrics_name: CpuOperationMetrics,
         time: float,
     ):
-        if not self._enable_cpu_op_level_metrics:
+        if not self.config.enable_cpu_op_level_metrics:
             return
-        self.cpu_operation_metrics[metrics_name].put_pair(self._next_batch_id, time)
+        self.cpu_operation_metrics[metrics_name].put_pair(self.next_batch_id, time)
 
     def _save_as_csv(
         self,
@@ -685,17 +692,21 @@ class MetricsStore(metaclass=Singleton):
         fig.write_image(f"{base_path}/{plot_name}.png")
 
     def _store_request_outputs(self):
-        if not self._enable_request_outputs:
+        if not self.config.enable_request_outputs:
             return
 
-        self.requests_outputs.sort(key=lambda x: int(x.request_id))
-        with open(f"{self._output_dir}/responses.json", "w") as f:
+        self.requests_outputs.sort(key=lambda x: int(x.seq_id))
+
+        with open(f"{self.output_dir}/responses.json", "w") as f:
             json.dump(
                 [asdict(response) for response in self.requests_outputs], f, indent="\t"
             )
 
     def _store_operation_metrics(self, base_plot_path: str):
-        if not self._enable_op_level_metrics and not self._enable_cpu_op_level_metrics:
+        if (
+            not self.config.enable_op_level_metrics
+            and not self.config.enable_cpu_op_level_metrics
+        ):
             return
 
         total_operation_runtimes: Dict[str, float] = {}
@@ -706,7 +717,7 @@ class MetricsStore(metaclass=Singleton):
             )
             # In `is_op_enabled` we take operations from one of the layers and only rank 0 is considered.
             total_operation_runtimes[dataseries.metric_name] = (
-                dataseries.sum * self._model_num_layers
+                dataseries.sum * self.model_num_layers
             )
 
         for dataseries in self.cpu_operation_metrics.values():
@@ -723,7 +734,7 @@ class MetricsStore(metaclass=Singleton):
             total_operation_runtimes,
         )
 
-        if not self._keep_individual_batch_metrics:
+        if not self.config.keep_individual_batch_metrics:
             return
 
         for dataseries in self.operation_metrics_per_batch.values():
@@ -738,7 +749,7 @@ class MetricsStore(metaclass=Singleton):
         self._save_as_csv(
             dataseries_list=operations_dataseries_list,
             key_to_join=BATCH_ID_STR,
-            base_path=self._output_dir,
+            base_path=self.output_dir,
             file_name="operation_metrics",
         )
 
@@ -754,7 +765,7 @@ class MetricsStore(metaclass=Singleton):
         self._save_as_csv(
             dataseries_list=cpu_operations_dataseries_list,
             key_to_join=BATCH_ID_STR,
-            base_path=self._output_dir,
+            base_path=self.output_dir,
             file_name="cpu_operation_metrics",
         )
 
@@ -766,7 +777,7 @@ class MetricsStore(metaclass=Singleton):
         self._save_as_csv(
             dataseries_list=all_seq_metrics,
             key_to_join=REQUEST_ID_STR,
-            base_path=self._output_dir,
+            base_path=self.output_dir,
             file_name="sequence_metrics",
         )
 
@@ -777,7 +788,7 @@ class MetricsStore(metaclass=Singleton):
             dataseries.plot_cdf(base_plot_path, dataseries.y_name, TIME_STR)
 
     def _store_batch_metrics(self, base_plot_path: str):
-        if self._keep_individual_batch_metrics:
+        if self.config.keep_individual_batch_metrics:
             all_batch_metrics = list(
                 self.batch_metrics_count_distribution.values()
             ) + list(self.batch_metrics_time_distribution.values())
@@ -785,13 +796,13 @@ class MetricsStore(metaclass=Singleton):
             self._save_as_csv(
                 dataseries_list=all_batch_metrics,
                 key_to_join=BATCH_ID_STR,
-                base_path=self._output_dir,
+                base_path=self.output_dir,
                 file_name="batch_metrics",
             )
 
         for dataseries in self.batch_metrics_time_distribution.values():
             dataseries.plot_cdf(base_plot_path, dataseries.metric_name, TIME_STR)
-            if self._keep_individual_batch_metrics:
+            if self.config.keep_individual_batch_metrics:
                 dataseries.plot_step(
                     base_plot_path,
                     f"{dataseries.metric_name}_per_batch",
@@ -801,7 +812,7 @@ class MetricsStore(metaclass=Singleton):
 
         for dataseries in self.batch_metrics_count_distribution.values():
             dataseries.plot_cdf(base_plot_path, dataseries.metric_name, COUNT_STR)
-            if self._keep_individual_batch_metrics:
+            if self.config.keep_individual_batch_metrics:
                 dataseries.plot_step(
                     base_plot_path,
                     f"{dataseries.metric_name}_per_batch",
@@ -812,7 +823,7 @@ class MetricsStore(metaclass=Singleton):
     def _store_completion_metrics(self, base_plot_path: str):
         for dataseries in self.token_metrics_time_distribution.values():
             dataseries.plot_cdf(base_plot_path, dataseries.metric_name, TIME_STR)
-        if self._keep_individual_batch_metrics:
+        if self.config.keep_individual_batch_metrics:
             for dataseries in self.token_metrics_time_list.values():
                 dataseries.save_df(
                     path=base_plot_path, plot_name=dataseries.metric_name
@@ -832,15 +843,15 @@ class MetricsStore(metaclass=Singleton):
             )
 
     def _store_chrome_trace(self):
-        if not self._enable_chrome_trace:
+        if not self.config.enable_chrome_trace:
             return
 
-        file_path = f"{self._output_dir}/chrome_trace.json"
+        file_path = f"{self.output_dir}/chrome_trace.json"
         with open(file_path, "w") as f:
             json.dump(self.chrome_trace, f)
 
         if wandb.run:
-            zip_file_path = f"{self._output_dir}/chrome_trace.zip"
+            zip_file_path = f"{self.output_dir}/chrome_trace.zip"
             with zipfile.ZipFile(
                 zip_file_path, "w", compression=zipfile.ZIP_DEFLATED
             ) as zf:
@@ -853,7 +864,7 @@ class MetricsStore(metaclass=Singleton):
     @check_enabled
     @if_write_metrics
     def plot(self):
-        base_plot_path = f"{self._output_dir}/plots/"
+        base_plot_path = f"{self.output_dir}/plots/"
         os.makedirs(base_plot_path, exist_ok=True)
 
         self._store_seq_metrics(base_plot_path)
@@ -875,7 +886,7 @@ class MetricsStore(metaclass=Singleton):
                 other.token_metrics_time_distribution[metric_name]
             )
 
-        if self._keep_individual_batch_metrics:
+        if self.config.keep_individual_batch_metrics:
             for metric_name in TokenMetricsTimeList:
                 self.token_metrics_time_list[metric_name].merge(
                     other.token_metrics_time_list[metric_name]

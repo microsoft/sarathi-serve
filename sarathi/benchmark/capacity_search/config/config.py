@@ -24,7 +24,7 @@ class ModelConfig:
 
     def to_config_dict(self):
         return {
-            "model_name": self.identifier,
+            "model_config_model": self.identifier,
         }
 
     def is_parallel_spec_valid(self, spec_name: str):
@@ -53,16 +53,16 @@ class TraceConfig:
 
     def to_config_dict(self):
         return {
-            "request_generator_provider": "synthetic",
-            "synthetic_request_generator_length_provider": "trace",
-            "synthetic_request_generator_interval_provider": "poisson",
-            "trace_request_length_generator_max_tokens": self.max_seq_len,
-            "model_max_model_len": self.max_seq_len,
-            "trace_request_length_generator_trace_file": self.trace_file,
-            "trace_request_length_generator_prefill_scale_factor": 1,
-            "trace_request_length_generator_decode_scale_factor": 1,
-            "synthetic_request_generator_num_requests": self.num_requests,
-            "vllm_scheduler_max_tokens_in_batch": self.max_seq_len,
+            "request_generator_config_type": "SYNTHETIC",
+            "length_generator_config_type": "TRACE",
+            "interval_generator_config_type": "POISSON",
+            "trace_request_length_generator_config_max_tokens": self.max_seq_len,
+            "model_config_max_model_len": self.max_seq_len,
+            "trace_request_length_generator_config_trace_file": self.trace_file,
+            "trace_request_length_generator_config_prefill_scale_factor": 1,
+            "trace_request_length_generator_config_decode_scale_factor": 1,
+            "synthetic_request_generator_config_num_requests": self.num_requests,
+            "vllm_scheduler_config_max_batched_tokens": self.max_seq_len,
         }
 
 
@@ -87,20 +87,20 @@ class SchedulerConfig:
     def to_config_dict(self):
         if self.scheduler == "vllm":
             return {
-                "replica_scheduler_provider": "vllm",
-                "replica_scheduler_max_batch_size": self.batch_size,
+                "scheduler_config_type": "VLLM",
+                "vllm_scheduler_config_max_num_seqs": self.batch_size,
             }
         elif self.scheduler == "orca":
             return {
-                "replica_scheduler_provider": "orca",
-                "replica_scheduler_max_batch_size": self.batch_size,
+                "scheduler_config_type": "ORCA",
+                "orca_scheduler_config_max_num_seqs": self.batch_size,
             }
         elif self.scheduler == "sarathi":
             assert self.chunk_size is not None
             return {
-                "replica_scheduler_provider": "sarathi",
-                "replica_scheduler_max_batch_size": self.batch_size,
-                "sarathi_scheduler_chunk_size": self.chunk_size,
+                "scheduler_config_type": "SARATHI",
+                "sarathi_scheduler_config_max_num_seqs": self.batch_size,
+                "sarathi_scheduler_config_chunk_size": self.chunk_size,
             }
         else:
             raise ValueError(f"Unknown scheduler: {self.scheduler}")
@@ -123,8 +123,8 @@ class ParallelConfig:
 
     def to_config_dict(self):
         return {
-            "model_tensor_parallel_degree": self.tp_dimension,
-            "model_pipeline_parallel_degree": self.pp_dimension,
+            "parallel_config_tensor_parallel_size": self.tp_dimension,
+            "parallel_config_pipeline_parallel_size": self.pp_dimension,
         }
 
 
@@ -237,23 +237,24 @@ class BenchmarkConfig:
     def to_config_dict(self):
         if self.wandb_project:
             wandb_args = {
-                "metrics_store_wandb_project": self.wandb_project,
-                "metrics_store_wandb_group": self.job_config.get_key(),
-                "metrics_store_wandb_sweep_id": self.wandb_sweep_id,
-                "metrics_store_wandb_run_id": self.get_run_id(),
-                "metrics_store_wandb_run_name": f"qps_{self.qps}",
+                "metrics_config_wandb_project": self.wandb_project,
+                "metrics_config_wandb_group": self.job_config.get_key(),
+                "metrics_config_wandb_sweep_id": self.wandb_sweep_id,
+                "metrics_config_wandb_run_id": self.get_run_id(),
+                "metrics_config_wandb_run_name": f"qps_{self.qps}",
             }
         else:
             wandb_args = {}
+
         return {
             **self.job_config.to_config_dict(),
             "output_dir": self.get_run_dir(),
-            "poisson_request_interval_generator_qps": self.qps,
+            "poisson_request_interval_generator_config_qps": self.qps,
             "time_limit": self.time_limit * 60,  # to seconds
-            "metrics_store_enable_op_level_metrics": False,
-            "metrics_store_enable_cpu_op_level_metrics": False,
-            "metrics_store_keep_individual_batch_metrics": False,
-            "write_chrome_trace": False,
+            "metrics_config_enable_op_level_metrics": False,
+            "metrics_config_enable_cpu_op_level_metrics": False,
+            "metrics_config_keep_individual_batch_metrics": False,
+            "metrics_config_enable_chrome_trace": False,
             **wandb_args,
         }
 

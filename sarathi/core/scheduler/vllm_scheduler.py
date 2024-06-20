@@ -1,7 +1,7 @@
 import time
 from typing import List
 
-from sarathi.config import CacheConfig, VLLMSchedulerConfig
+from sarathi.config import CacheConfig, ModelConfig, VllmSchedulerConfig
 from sarathi.core.block_space_manager.vllm_block_space_manager import (
     VLLMBlockSpaceManager,
 )
@@ -17,15 +17,16 @@ class VLLMScheduler(BaseScheduler):
 
     def __init__(
         self,
-        scheduler_config: VLLMSchedulerConfig,
+        model_config: ModelConfig,
+        scheduler_config: VllmSchedulerConfig,
         cache_config: CacheConfig,
     ) -> None:
-        super().__init__(scheduler_config, cache_config)
+        super().__init__(model_config, scheduler_config, cache_config)
 
-        self.prompt_limit = min(
-            self.scheduler_config.max_model_len,
-            self.scheduler_config.max_num_batched_tokens,
+        self.max_batched_tokens = self.scheduler_config.get_max_num_batched_tokens(
+            self.model_config.max_model_len
         )
+        self.prompt_limit = self.max_batched_tokens
 
     def get_block_space_manager_class(self):
         return VLLMBlockSpaceManager
@@ -61,10 +62,7 @@ class VLLMScheduler(BaseScheduler):
                 break
 
             # If the number of batched tokens exceeds the limit, stop.
-            if (
-                num_batched_tokens + num_prompt_tokens
-                > self.scheduler_config.max_num_batched_tokens
-            ):
+            if num_batched_tokens + num_prompt_tokens > self.max_num_batched_tokens:
                 break
 
             if len(self.running) + 1 > self.scheduler_config.max_num_seqs:

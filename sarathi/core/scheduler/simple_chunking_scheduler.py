@@ -2,7 +2,7 @@ import time
 from enum import Enum, auto
 from typing import List
 
-from sarathi.config import CacheConfig, SimpleChunkingSchedulerConfig
+from sarathi.config import CacheConfig, ModelConfig, SimpleChunkingSchedulerConfig
 from sarathi.core.block_space_manager.vllm_block_space_manager import (
     VLLMBlockSpaceManager,
 )
@@ -24,12 +24,12 @@ class SimpleChunkingScheduler(BaseScheduler):
 
     def __init__(
         self,
+        model_config: ModelConfig,
         scheduler_config: SimpleChunkingSchedulerConfig,
         cache_config: CacheConfig,
     ) -> None:
-        super().__init__(scheduler_config, cache_config)
+        super().__init__(model_config, scheduler_config, cache_config)
 
-        self.prompt_limit = self.scheduler_config.max_model_len
         self.chunk_size = self.scheduler_config.chunk_size
         self.whose_turn = Turn.PREFILL
 

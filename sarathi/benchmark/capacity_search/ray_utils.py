@@ -4,7 +4,7 @@ from typing import Optional
 
 import ray
 
-from sarathi.benchmark.types import ReplicaResourceMapping
+from sarathi.types import ReplicaResourceMapping
 
 
 def get_ip() -> str:
@@ -86,7 +86,7 @@ class ResourceManager:
                         resource_mapping.append((node, i))
 
                     if len(resource_mapping) == num_gpus:
-                        return {"0": resource_mapping}
+                        return [resource_mapping]
         else:
             # all GPUs must be allocated on the same node and contiguously
             for node in self._nodes:
@@ -106,13 +106,13 @@ class ResourceManager:
                         self._node_free_map[node] = False
                         for _, i in resource_mapping:
                             self._gpu_free_map[node][i] = False
-                        return {"0": resource_mapping}
+                        return [resource_mapping]
 
         # currently we only support single replica allocation
         return {}
 
     def release_resources(self, replica_resource_mapping: ReplicaResourceMapping):
-        for resource_mapping in replica_resource_mapping.values():
+        for resource_mapping in replica_resource_mapping:
             for node, gpu_id in resource_mapping:
                 self._gpu_free_map[node][gpu_id] = True
 
@@ -149,9 +149,9 @@ class RayParallelRunner:
                 )
                 time.sleep(0.1)
             # launch the task
-            runner_node = replica_resource_mapping["0"][0][
+            runner_node = replica_resource_mapping[0][0][
                 0
-            ]  # replica 0, first worker, node
+            ]  # replica 0, rank 0, node_ip
             promise = remote_func.options(resources={runner_node: 0.001}).remote(
                 self._resource_manager, replica_resource_mapping, job_config
             )

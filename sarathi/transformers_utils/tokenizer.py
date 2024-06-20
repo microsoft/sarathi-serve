@@ -104,7 +104,7 @@ def detokenize_incrementally(
             )
         except ValueError as e:
             new_tokens = ["[UNK]"] * 6
-            logger.warning(f"Warning: {e}", flush=True)
+            logger.warning(f"Warning: {e}")
 
         output_tokens = new_tokens
         # 5 is an arbitrary value that should work for all
@@ -120,7 +120,7 @@ def detokenize_incrementally(
             )
         except ValueError as e:
             new_tokens = [prev_tokens[-1]]
-            logger.warning(f"Warning: {e}", flush=True)
+            logger.warning(f"Warning: {e}")
         output_tokens = prev_tokens + new_tokens
 
     # The prefix text is necessary only to defeat cleanup algorithms in

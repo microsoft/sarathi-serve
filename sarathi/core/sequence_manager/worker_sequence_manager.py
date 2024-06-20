@@ -1,6 +1,6 @@
 from typing import List
 
-from sarathi.config import BaseSchedulerConfig, CacheConfig
+from sarathi.config import SystemConfig
 from sarathi.core.block_space_manager.block_space_manager_registry import (
     BlockSpaceManagerRegistry,
 )
@@ -12,18 +12,17 @@ class WorkerSequenceManager(BaseSequenceManager):
 
     def __init__(
         self,
-        cache_config: CacheConfig,
-        scheduler_config: BaseSchedulerConfig,
+        config: SystemConfig,
     ):
         super().__init__()
         # we will have a clone of block manager here, it is supposed
         # to work in sync block manager in scheduler the idea is to avoid
         # sending block table every time to the worker
         self.block_manager = BlockSpaceManagerRegistry.get(
-            scheduler_config.type,
-            cache_config.block_size,
-            cache_config.num_gpu_blocks,
-            scheduler_config.max_model_len,
+            config.scheduler_config.get_type(),
+            config.cache_config.block_size,
+            config.cache_config.num_gpu_blocks,
+            config.model_config.max_model_len,
         )
 
     def _free_seq(self, seq_id: int) -> None:

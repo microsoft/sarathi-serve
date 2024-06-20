@@ -2,7 +2,10 @@ import datetime
 from tqdm import tqdm
 from typing import List
 
+from sarathi.config import ModelConfig, ParallelConfig, SarathiSchedulerConfig, MetricsConfig, SystemConfig, ReplicaConfig
+from sarathi.types import SchedulerType
 from sarathi import LLMEngine, SamplingParams, RequestOutput
+
 
 BASE_OUTPUT_DIR = "./offline_inference_output"
 
@@ -23,22 +26,38 @@ sampling_params = SamplingParams(temperature=0.8, top_p=0.95, max_tokens=100)
 
 output_dir = f"{BASE_OUTPUT_DIR}/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
-llm_engine = LLMEngine.from_engine_args(
+replica_config = ReplicaConfig(
+    output_dir=output_dir,
+)
+
+model_config = ModelConfig(
     model="meta-llama/Llama-2-7b-hf",
-    # parallel config
-    tensor_parallel_size=4,
+)
+
+parallel_config = ParallelConfig(
+    tensor_parallel_size=2,
     pipeline_parallel_size=2,
-    trust_remote_code=True,
-    max_model_len=4096,
-    # scheduler config
-    scheduler_type="sarathi",
+)
+
+scheduler_config = SarathiSchedulerConfig(
     chunk_size=100,
     max_num_seqs=4,
-    # metrics config
+)
+
+metrics_config = MetricsConfig(
     write_metrics=False,
-    output_dir=output_dir,
     enable_chrome_trace=True,
 )
+
+system_config = SystemConfig(
+    replica_config=replica_config,
+    model_config=model_config,
+    parallel_config=parallel_config,
+    scheduler_config=scheduler_config,
+    metrics_config=metrics_config,
+)
+
+llm_engine = LLMEngine.from_system_config(system_config)
 
 
 def generate(

@@ -4,13 +4,7 @@ from queue import Queue
 from threading import Event, Thread
 from typing import List
 
-from sarathi.config import (
-    BaseSchedulerConfig,
-    CacheConfig,
-    MetricsConfig,
-    ModelConfig,
-    ParallelConfig,
-)
+from sarathi.config import SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SequenceMetadata
@@ -41,33 +35,15 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
     iteration-level scheduling and efficient memory management to maximize the
     serving throughput.
 
-    NOTE: The config arguments are derived from the `EngineArgs` class. For the
-    comprehensive list of arguments, see `EngineArgs`.
-
     Args:
-        model_config: The configuration related to the LLM model.
-        cache_config: The configuration related to the KV cache memory
-            management.
-        parallel_config: The configuration related to distributed execution.
-        scheduler_config: The configuration related to the request scheduler.
-        metrics_config: The configuration related to metrics store.
+        config; System Config: The system configuration for the engine.
     """
 
     def __init__(
         self,
-        model_config: ModelConfig,
-        cache_config: CacheConfig,
-        parallel_config: ParallelConfig,
-        scheduler_config: BaseSchedulerConfig,
-        metrics_config: MetricsConfig,
+        config: SystemConfig,
     ) -> None:
-        super().__init__(
-            model_config,
-            cache_config,
-            parallel_config,
-            scheduler_config,
-            metrics_config,
-        )
+        super().__init__(config)
         # Create the request queue.
         self.has_started_execution_loops = False
         self.scheduler_output_queue = Queue()
@@ -84,7 +60,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         )
 
     def _validate_parallel_config(self) -> None:
-        assert self.parallel_config.pipeline_parallel_size > 1
+        assert self.config.parallel_config.pipeline_parallel_size > 1
 
     def start_execution_loops(self) -> None:
         """Starts the execution loop."""
@@ -165,7 +141,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
             sampler_outputs = self._run_worker(
                 (
                     0,
-                    self.parallel_config.pipeline_parallel_size - 1,
+                    self.config.parallel_config.pipeline_parallel_size - 1,
                 ),  # TP rank zero for last pipeline stage
                 "get_output",
             )

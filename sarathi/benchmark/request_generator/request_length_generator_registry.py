@@ -10,15 +10,12 @@ from sarathi.benchmark.request_generator.uniform_request_length_generator import
 from sarathi.benchmark.request_generator.zipf_request_length_generator import (
     ZipfRequestLengthGenerator,
 )
-from sarathi.benchmark.types import RequestLengthGeneratorType
+from sarathi.types import RequestLengthGeneratorType
 from sarathi.utils.base_registry import BaseRegistry
 
 
 class RequestLengthGeneratorRegistry(BaseRegistry):
-
-    @classmethod
-    def get_key_from_str(cls, key_str: str) -> RequestLengthGeneratorType:
-        return RequestLengthGeneratorType.from_str(key_str)
+    pass
 
 
 RequestLengthGeneratorRegistry.register(

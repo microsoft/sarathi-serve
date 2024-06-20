@@ -1,7 +1,7 @@
 import time
 from typing import List
 
-from sarathi.config import CacheConfig, OrcaSchedulerConfig
+from sarathi.config import CacheConfig, ModelConfig, OrcaSchedulerConfig
 from sarathi.core.block_space_manager.orca_block_space_manager import (
     OrcaBlockSpaceManager,
 )
@@ -17,12 +17,11 @@ class OrcaScheduler(BaseScheduler):
 
     def __init__(
         self,
+        model_config: ModelConfig,
         scheduler_config: OrcaSchedulerConfig,
         cache_config: CacheConfig,
     ) -> None:
-        super().__init__(scheduler_config, cache_config)
-
-        self.prompt_limit = self.scheduler_config.max_model_len
+        super().__init__(model_config, scheduler_config, cache_config)
 
     def get_block_space_manager_class(self):
         return OrcaBlockSpaceManager

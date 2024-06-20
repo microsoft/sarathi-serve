@@ -13,14 +13,7 @@ from sarathi.model_executor.attention.flashinfer_unpaged_attention_wrapper impor
 from sarathi.model_executor.attention.no_op_attention_wrapper import (
     NoOpAttentionWrapper,
 )
-
-
-class AttentionBackend(Enum):
-    FLASHINFER = "FLASHINFER"
-    FLASH_ATTENTION = "FLASH_ATTENTION"
-    FLASHINFER_UNPAGED = "FLASHINFER_UNPAGED"
-    NO_OP = "NO_OP"
-
+from sarathi.types import AttentionBackend
 
 ATTENTION_BACKEND = AttentionBackend.NO_OP
 

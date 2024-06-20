@@ -2,7 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
-from sarathi.config import BaseSchedulerConfig, CacheConfig
+from sarathi.config import BaseSchedulerConfig, CacheConfig, ModelConfig
 from sarathi.core.block_space_manager.block_space_manager_registry import (
     BlockSpaceManagerRegistry,
 )
@@ -19,10 +19,12 @@ class BaseScheduler(ABC):
 
     def __init__(
         self,
+        model_config: ModelConfig,
         scheduler_config: BaseSchedulerConfig,
         cache_config: CacheConfig,
     ) -> None:
-        self.metrics_store = MetricsStore()
+        self.metrics_store = MetricsStore.get_instance()
+        self.model_config = model_config
         self.scheduler_config = scheduler_config
         self.cache_config = cache_config
 
@@ -33,11 +35,12 @@ class BaseScheduler(ABC):
         self.policy = PolicyFactory.get_policy(policy_name="fcfs")
         # Create the block space manager.
         self.block_manager = BlockSpaceManagerRegistry.get(
-            scheduler_config.type,
+            scheduler_config.get_type(),
             cache_config.block_size,
             cache_config.num_gpu_blocks,
-            scheduler_config.max_model_len,
+            model_config.max_model_len,
         )
+        self.prompt_limit = model_config.max_model_len
 
         # number of running batches should be less than or equal to the number of pipeline stages
         self.num_running_batches = 0
@@ -121,7 +124,7 @@ class BaseScheduler(ABC):
         self.waiting.insert(0, seq)
 
     def _check_request_prompt_length(self, seq: Sequence) -> bool:
-        if seq.get_len() > self.scheduler_config.max_model_len:
+        if seq.get_len() > self.prompt_limit:
             logger.warning(
                 f"Input prompt ({seq.get_len()} tokens) is too long"
                 f" and exceeds limit of {seq.sampling_params.max_tokens}"

@@ -15,7 +15,7 @@ class CudaTimer:
         rank: Optional[int] = None,
     ):
         self.name = name
-        self.metrics_store = MetricsStore()
+        self.metrics_store = MetricsStore.get_instance()
         self.layer_id = layer_id
         self.disabled = (name is None) or not self.metrics_store.is_op_enabled(
             metric_name=self.name, layer_id=layer_id, rank=rank

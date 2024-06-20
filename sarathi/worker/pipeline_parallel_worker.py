@@ -7,13 +7,7 @@ from typing import Optional, Tuple
 import torch
 import torch.distributed
 
-from sarathi.config import (
-    BaseSchedulerConfig,
-    CacheConfig,
-    MetricsConfig,
-    ModelConfig,
-    ParallelConfig,
-)
+from sarathi.config import CacheConfig, SystemConfig
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs
 from sarathi.logger import init_logger
@@ -33,21 +27,13 @@ class PipelineParallelWorker(BaseWorker):
 
     def __init__(
         self,
-        model_config: ModelConfig,
-        parallel_config: ParallelConfig,
-        scheduler_config: BaseSchedulerConfig,
-        cache_config: CacheConfig,
-        metrics_config: MetricsConfig,
+        config: SystemConfig,
         local_rank: int,
         rank: Optional[int] = None,
         distributed_init_method: Optional[str] = None,
     ) -> None:
         super().__init__(
-            model_config,
-            parallel_config,
-            scheduler_config,
-            cache_config,
-            metrics_config,
+            config,
             local_rank,
             rank,
             distributed_init_method,
@@ -57,7 +43,7 @@ class PipelineParallelWorker(BaseWorker):
         self.execution_thread = Thread(target=self._execution_loop, daemon=True)
 
     def _verify_parallel_config(self) -> None:
-        assert self.parallel_config.pipeline_parallel_size > 1
+        assert self.config.parallel_config.pipeline_parallel_size > 1
 
     def init_cache_engine(self, cache_config: CacheConfig) -> None:
         super().init_cache_engine(cache_config)

@@ -4,13 +4,7 @@ import time
 from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
-from sarathi.config import (
-    BaseSchedulerConfig,
-    CacheConfig,
-    MetricsConfig,
-    ModelConfig,
-    ParallelConfig,
-)
+from sarathi.config import SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.sampling_params import SamplingParams
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
@@ -42,60 +36,41 @@ class BaseLLMEngine:
     iteration-level scheduling and efficient memory management to maximize the
     serving throughput.
 
-    NOTE: The config arguments are derived from the `EngineArgs` class. For the
-    comprehensive list of arguments, see `EngineArgs`.
-
     Args:
-        model_config: The configuration related to the LLM model.
-        cache_config: The configuration related to the KV cache memory
-            management.
-        parallel_config: The configuration related to distributed execution.
-        scheduler_config: The configuration related to the request scheduler.
-        metrics_config: The configuration related to metrics store.
+        config; System Config: The system configuration for the engine.
     """
 
     def __init__(
         self,
-        model_config: ModelConfig,
-        cache_config: CacheConfig,
-        parallel_config: ParallelConfig,
-        scheduler_config: BaseSchedulerConfig,
-        metrics_config: MetricsConfig,
+        config: SystemConfig,
     ) -> None:
         logger.info(
             "Initializing an LLM engine with config: "
-            f"model={model_config.model!r}, "
-            f"tokenizer={model_config.tokenizer!r}, "
-            f"tokenizer_mode={model_config.tokenizer_mode}, "
-            f"revision={model_config.revision}, "
-            f"trust_remote_code={model_config.trust_remote_code}, "
-            f"dtype={model_config.dtype}, "
-            f"download_dir={model_config.download_dir!r}, "
-            f"load_format={model_config.load_format}, "
-            f"tensor_parallel_size={parallel_config.tensor_parallel_size}, "
-            f"pipeline_parallel_size={parallel_config.pipeline_parallel_size}, "
-            f"seed={model_config.seed})"
+            f"model={config.model_config.model!r}, "
+            f"dtype={config.model_config.dtype}, "
+            f"tensor_parallel_size={config.parallel_config.tensor_parallel_size}, "
+            f"pipeline_parallel_size={config.parallel_config.pipeline_parallel_size}, "
+            f"seed={config.model_config.seed})"
         )
         # TODO(woosuk): Print more configs in debug mode.
 
-        self.model_config = model_config
-        self.cache_config = cache_config
-        self.parallel_config = parallel_config
-        self.scheduler_config = scheduler_config
-        self.metrics_config = metrics_config
+        self.config = config
         self._verify_args()
 
         self.tokenizer = get_tokenizer(
-            model_config.tokenizer,
-            tokenizer_mode=model_config.tokenizer_mode,
-            trust_remote_code=model_config.trust_remote_code,
-            revision=model_config.revision,
+            config.model_config.model,
+            trust_remote_code=config.model_config.trust_remote_code,
+            revision=config.model_config.revision,
         )
 
         self.seq_manager = EngineSequenceManager(self.tokenizer)
         self.seq_counter = Counter()
 
-        self.metrics_store = MetricsStore(metrics_config)
+        self.metrics_store = MetricsStore.get_or_create_instance(
+            config.replica_config,
+            config.model_config,
+            config.metrics_config,
+        )
 
         self.worker_map: Dict[ModelParallelRank, int] = {}
 
@@ -115,7 +90,10 @@ class BaseLLMEngine:
 
         # Create the scheduler.
         self.scheduler = SchedulerRegistry.get(
-            scheduler_config.type, scheduler_config, cache_config
+            config.scheduler_config.get_type(),
+            config.model_config,
+            config.scheduler_config,
+            config.cache_config,
         )
 
         self._scheduler_timer = CpuTimer(CpuOperationMetrics.SCHEDULE)
@@ -124,7 +102,7 @@ class BaseLLMEngine:
         )
 
     def _validate_parallel_config(self) -> None:
-        assert self.parallel_config.pipeline_parallel_size == 1
+        assert self.config.parallel_config.pipeline_parallel_size == 1
 
     def _get_worker_impl(self):
         # Lazy import the Worker to avoid importing torch.cuda/xformers
@@ -136,17 +114,17 @@ class BaseLLMEngine:
         return BaseWorker
 
     def _init_workers_ray(self, **ray_remote_kwargs):
-        replica_resource_mapping = self.parallel_config.replica_resource_mapping
-        logger.info(
-            f"Starting workers with resource mapping: {replica_resource_mapping}"
+        resource_mapping = self.config.replica_config.get_resource_mapping(
+            self.config.parallel_config.world_size
         )
+        logger.info(f"Starting workers with resource mapping: {resource_mapping}")
 
         self.workers: List[RayWorker] = []
 
         unset_cuda_visible_devices()
 
         driver_ip = None
-        for rank, (node_ip, _) in enumerate(replica_resource_mapping):
+        for rank, (node_ip, _) in enumerate(resource_mapping):
             worker_class = ray.remote(
                 num_cpus=1,
                 # num_gpus=1, # we don't use ray for managing GPUs
@@ -172,7 +150,7 @@ class BaseLLMEngine:
                 else:
                     driver_ip = get_ip()
 
-            worker = worker_class.remote(self.model_config.trust_remote_code)
+            worker = worker_class.remote(self.config.model_config.trust_remote_code)
 
             self.workers.append(worker)
 
@@ -185,23 +163,16 @@ class BaseLLMEngine:
         )
 
         # Initialize torch distributed process group for the workers.
-        model_config = copy.deepcopy(self.model_config)
-        parallel_config = copy.deepcopy(self.parallel_config)
-        scheduler_config = copy.deepcopy(self.scheduler_config)
-        cache_config = copy.deepcopy(self.cache_config)
-        metrics_config = self.metrics_store.get_config_for_worker()
+        config = copy.deepcopy(self.config)
+        config.metrics_config = self.metrics_store.get_config_for_worker()
 
         worker_impl = self._get_worker_impl()
 
         for rank, worker in enumerate(self.workers):
-            local_rank = replica_resource_mapping[rank][1]
+            local_rank = resource_mapping[rank][1]
             promise = worker.init_worker.remote(
                 lambda rank=rank, local_rank=local_rank: worker_impl(
-                    model_config,
-                    parallel_config,
-                    scheduler_config,
-                    cache_config,
-                    metrics_config,
+                    config,
                     local_rank,
                     rank,
                     distributed_init_method,
@@ -216,7 +187,9 @@ class BaseLLMEngine:
 
     def _verify_args(self) -> None:
         self._validate_parallel_config()
-        self.model_config.verify_with_parallel_config(self.parallel_config)
+        self.config.model_config.verify_with_parallel_config(
+            self.config.parallel_config
+        )
 
     def _init_cache(self) -> None:
         """Profiles the memory usage and initializes the KV cache."""
@@ -224,8 +197,8 @@ class BaseLLMEngine:
         num_gpu_blocks_across_workers = self._run_workers(
             "profile_num_available_blocks",
             get_all_outputs=True,
-            block_size=self.cache_config.block_size,
-            gpu_memory_utilization=self.cache_config.gpu_memory_utilization,
+            block_size=self.config.cache_config.block_size,
+            gpu_memory_utilization=self.config.worker_config.gpu_memory_utilization,
         )
 
         # Since we use a shared centralized controller, we take the minimum
@@ -242,7 +215,7 @@ class BaseLLMEngine:
                 "initializing the engine."
             )
         max_blocks_per_request = math.ceil(
-            self.model_config.max_model_len / self.cache_config.block_size
+            self.config.model_config.max_model_len / self.config.cache_config.block_size
         )
         if num_gpu_blocks < max_blocks_per_request:
             raise ValueError(
@@ -250,11 +223,13 @@ class BaseLLMEngine:
                 f"Need {max_blocks_per_request}, available {num_gpu_blocks} gpu blocks. "
                 f"Try decreasing `max_batch_size`, `max_model_len`."
             )
-        self.cache_config.num_gpu_blocks = num_gpu_blocks
+        self.config.cache_config.num_gpu_blocks = num_gpu_blocks
 
         # Initialize the cache.
         self._run_workers(
-            "init_cache_engine", cache_config=self.cache_config, get_all_outputs=True
+            "init_cache_engine",
+            cache_config=self.config.cache_config,
+            get_all_outputs=True,
         )
 
     def _init_worker_map(self) -> None:
@@ -324,7 +299,7 @@ class BaseLLMEngine:
             prompt_token_ids = self.tokenizer.encode(prompt)
 
         # Create the sequences.
-        block_size = self.cache_config.block_size
+        block_size = self.config.cache_config.block_size
         eos_token_id = self.tokenizer.eos_token_id
         seq_id = next(self.seq_counter)
         seq = Sequence(
@@ -344,10 +319,6 @@ class BaseLLMEngine:
         )
         self.scheduler.add_seq(seq)
         self.metrics_store.on_request_arrival(seq)
-
-    def get_model_config(self) -> ModelConfig:
-        """Gets the model configuration."""
-        return self.model_config
 
     def get_num_unfinished_requests(self) -> int:
         """Gets the number of unfinished requests."""
