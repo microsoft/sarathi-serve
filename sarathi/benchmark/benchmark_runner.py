@@ -59,6 +59,9 @@ class BenchmarkRunner:
         system_config = self.config.create_system_config(replica_config)
         self.llm_engine = LLMEngine.from_system_config(system_config)
 
+        if wandb.run is not None:
+            wandb.config.update(self.config.to_dict())
+
     def _get_input_params(
         self, request: Request, first_request_time: float
     ) -> SamplingParams:
@@ -251,7 +254,7 @@ class BenchmarkRunnerLauncher:
         )
 
         if wandb.run is not None:
-            wandb.config.update(self.config.get_dict())
+            wandb.config.update(self.config.to_dict())
 
         metrics_store.mark_initial_memory_profiling_done()
 

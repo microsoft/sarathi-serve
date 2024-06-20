@@ -21,4 +21,4 @@ format/autopep8: ## format code with autopep8
 format/isort: ## format code with isort
 	isort --profile black sarathi
 
-format: format/isort format/black ## format code
+format: format/black format/isort  ## format code

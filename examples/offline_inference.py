@@ -2,7 +2,8 @@ import datetime
 from tqdm import tqdm
 from typing import List
 
-from sarathi.config import ModelConfig, ParallelConfig, SarathiSchedulerConfig, MetricsConfig, SystemConfig, ReplicaConfig
+from sarathi.types import AttentionBackend
+from sarathi.config import ModelConfig, ParallelConfig, SarathiSchedulerConfig, MetricsConfig, SystemConfig, ReplicaConfig, WorkerConfig
 from sarathi import LLMEngine, SamplingParams, RequestOutput
 
 

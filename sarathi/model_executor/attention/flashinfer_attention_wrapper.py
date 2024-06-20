@@ -8,7 +8,6 @@ from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
-from sarathi.model_executor.utils import round_up_to_multiple
 
 
 class FlashinferAttentionWrapper(BaseAttentionWrapper):
@@ -24,7 +23,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         super().init(model_config, parallel_config, block_size, device)
 
         workspace_buffer = torch.empty(
-            16 * 1024 * 1024, dtype=torch.uint8, device=device
+            128 * 1024 * 1024, dtype=torch.uint8, device=device
         )
         self._wrapper = BatchPrefillWithPagedKVCacheWrapper(workspace_buffer, "NHD")
 
@@ -137,6 +136,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.num_q_heads,
             self.num_kv_heads,
             self.head_dim,
+            self.block_size,
         )
 
     def end_forward(self):
