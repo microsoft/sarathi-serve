@@ -36,7 +36,7 @@ class SamplingParams:
         top_k: int = -1,
         stop: Union[None, str, List[str]] = None,
         ignore_eos: bool = False,
-        max_tokens: int = 16,
+        max_tokens: int = 2048,
     ) -> None:
         self.temperature = temperature
         self.top_p = top_p

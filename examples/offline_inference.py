@@ -2,8 +2,7 @@ import datetime
 from tqdm import tqdm
 from typing import List
 
-from sarathi.types import AttentionBackend
-from sarathi.config import ModelConfig, ParallelConfig, SarathiSchedulerConfig, MetricsConfig, SystemConfig, ReplicaConfig, WorkerConfig
+from sarathi.config import ModelConfig, ParallelConfig, SarathiSchedulerConfig, MetricsConfig, SystemConfig, ReplicaConfig
 from sarathi import LLMEngine, SamplingParams, RequestOutput
 
 
@@ -31,17 +30,17 @@ replica_config = ReplicaConfig(
 )
 
 model_config = ModelConfig(
-    model="meta-llama/Llama-2-7b-hf",
+    model="meta-llama/Meta-Llama-3-8B-Instruct",
 )
 
 parallel_config = ParallelConfig(
-    tensor_parallel_size=2,
-    pipeline_parallel_size=2,
+    tensor_parallel_size=1,
+    pipeline_parallel_size=1,
 )
 
 scheduler_config = SarathiSchedulerConfig(
     chunk_size=100,
-    max_num_seqs=4,
+    max_num_seqs=10,
 )
 
 metrics_config = MetricsConfig(

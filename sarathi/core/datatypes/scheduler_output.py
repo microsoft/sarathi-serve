@@ -15,7 +15,9 @@ class SchedulerOutputs:
         self.id = id
         self.ignored_seq_ids = ignored_seq_ids
         self.preempted_seq_ids = preempted_seq_ids
-        self.scheduled_seq_metadata_list = scheduled_seq_metadata_list
+        self.scheduled_seq_metadata_list = sorted(
+            scheduled_seq_metadata_list, key=lambda x: not x.is_prompt
+        )
         self.prompt_chunk_lens = [
             metadata.num_prompt_tokens for metadata in scheduled_seq_metadata_list
         ]
