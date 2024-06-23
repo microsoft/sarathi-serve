@@ -32,6 +32,8 @@ class OrcaScheduler(BaseScheduler):
 
         now = time.monotonic()
 
+        self.running = self.policy.sort_by_priority(now, self.running)
+
         for seq in self.running:
             if not seq.is_paused():
                 continue

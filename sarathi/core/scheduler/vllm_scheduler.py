@@ -23,10 +23,10 @@ class VLLMScheduler(BaseScheduler):
     ) -> None:
         super().__init__(model_config, scheduler_config, cache_config)
 
-        self.max_batched_tokens = self.scheduler_config.get_max_num_batched_tokens(
+        self.max_num_batched_tokens = self.scheduler_config.get_max_num_batched_tokens(
             self.model_config.max_model_len
         )
-        self.prompt_limit = self.max_batched_tokens
+        self.prompt_limit = self.max_num_batched_tokens
 
     def get_block_space_manager_class(self):
         return VLLMBlockSpaceManager

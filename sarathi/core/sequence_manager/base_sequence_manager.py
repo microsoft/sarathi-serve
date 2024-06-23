@@ -70,6 +70,7 @@ class BaseSequenceManager(ABC):
             self._preempt_seq(seq_id)
 
         seq_metadata_list: List[SequenceMetadata] = []
+
         for seq_sched_metadata in scheduler_outputs.scheduled_seq_metadata_list:
             self._on_seq_scheduled(seq_sched_metadata)
             seq = self.seq_map[seq_sched_metadata.seq_id]
@@ -116,6 +117,7 @@ class BaseSequenceManager(ABC):
         for scheduled_seq_metadata, sampler_output in zip(
             scheduler_outputs.scheduled_seq_metadata_list, sampler_outputs
         ):
+            assert scheduled_seq_metadata.seq_id == sampler_output.seq_id
             seq = self.seq_map[scheduled_seq_metadata.seq_id]
             if seq.is_waiting():
                 # seq is preempted

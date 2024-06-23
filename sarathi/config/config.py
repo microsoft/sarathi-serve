@@ -44,7 +44,7 @@ class ModelConfig:
             output). If None, will be derived from the model.
     """
 
-    model: str = "meta-llama/Meta-Llama-3-8B"
+    model: str = "meta-llama/Meta-Llama-3-8B-Instruct"
     trust_remote_code: bool = True
     download_dir: Optional[str] = None
     load_format: str = "auto"
@@ -167,7 +167,7 @@ class ParallelConfig:
     """
 
     pipeline_parallel_size: int = 1
-    tensor_parallel_size: int = 8
+    tensor_parallel_size: int = 1
 
     def __post_init__(self):
         self.world_size = self.pipeline_parallel_size * self.tensor_parallel_size
@@ -243,7 +243,7 @@ class FasterTransformerSchedulerConfig(BaseSchedulerConfig):
 
 @dataclass
 class SarathiSchedulerConfig(BaseSchedulerConfig):
-    chunk_size: int = 1024
+    chunk_size: int = 512
     enable_dynamic_chunking_schedule: bool = False
     low_chunk_size: Optional[int] = None
     high_chunk_size: Optional[int] = None

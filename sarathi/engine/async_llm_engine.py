@@ -91,6 +91,10 @@ class RequestTracker:
         """Process a request output from the engine."""
         request_id = request_output.seq_id
 
+        if request_id not in self._request_streams:
+            # aborted request
+            return
+
         self._request_streams[request_id].put(request_output)
         if request_output.finished:
             if verbose:

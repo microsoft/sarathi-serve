@@ -192,23 +192,21 @@ def _sample(
 ) -> SamplerOutputs:
     categorized_seq_indices = {t: [] for t in SamplingType}
     category_num_tokens = {t: 0 for t in SamplingType}
+
     for i, seq_metadata in enumerate(seq_metadata_list):
         sampling_type = seq_metadata.seq.sampling_params.sampling_type
         categorized_seq_indices[sampling_type].append(i)
         category_num_tokens[sampling_type] += 1
 
-    outputs: List[SamplerOutput] = []
-    category_start_idx = 0
+    outputs: List[SamplerOutput] = [None] * len(seq_metadata_list)
+
     for sampling_type in SamplingType:
         seq_indices = categorized_seq_indices[sampling_type]
-        seq_ids = [seq_metadata_list[i].seq.seq_id for i in seq_indices]
         num_tokens = category_num_tokens[sampling_type]
         if num_tokens == 0:
             continue
-        category_logprobs = logprobs[
-            category_start_idx : category_start_idx + num_tokens
-        ]
-        category_probs = probs[category_start_idx : category_start_idx + num_tokens]
+        category_logprobs = logprobs[seq_indices]
+        category_probs = probs[seq_indices]
         if sampling_type == SamplingType.GREEDY:
             sample_results = _greedy_sample(category_logprobs)
         elif sampling_type == SamplingType.RANDOM:
@@ -216,7 +214,8 @@ def _sample(
         else:
             raise ValueError(f"Unsupported sampling type: {sampling_type}")
 
-        for seq_id, sample_result in zip(seq_ids, sample_results):
-            outputs.append(SamplerOutput(seq_id, sample_result))
+        for seq_idx, sample_result in zip(seq_indices, sample_results):
+            seq_id = seq_metadata_list[seq_idx].seq.seq_id
+            outputs[seq_idx] = SamplerOutput(seq_id, sample_result)
 
     return outputs
