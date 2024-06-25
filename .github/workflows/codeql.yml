@@ -84,7 +84,7 @@ jobs:
     - if: matrix.build-mode == 'manual'
       shell: bash
       run: |
-        python3 -m pip install -e .
+        python3 -m pip install -e . --extra-index-url https://flashinfer.ai/whl/cu121/torch2.3/
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
