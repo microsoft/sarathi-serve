@@ -1,3 +1,0 @@
-ninja
-packaging
-torch==2.3
