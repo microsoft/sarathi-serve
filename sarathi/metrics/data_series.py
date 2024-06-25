@@ -3,7 +3,6 @@ from collections import defaultdict, deque
 
 import pandas as pd
 import plotly_express as px
-
 import wandb
 
 logger = logging.getLogger(__name__)
