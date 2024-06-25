@@ -10,8 +10,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import plotly.express as px
 import torch
-
 import wandb
+
 from sarathi.config import MetricsConfig, ModelConfig, ReplicaConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
