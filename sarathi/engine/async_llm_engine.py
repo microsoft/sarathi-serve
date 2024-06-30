@@ -351,19 +351,11 @@ class AsyncLLMEngine(LLMEngine):
         pass
 
     async def run_engine_loop(self):
-        has_requests_in_progress = False
         while True:
-            if not has_requests_in_progress:
-                logger.debug("Waiting for new requests...")
-                await self._request_tracker.wait_for_new_requests()
-                logger.debug("Got new requests!")
-
             # Abort if iteration takes too long due to unrecoverable errors
             # (eg. NCCL timeouts).
             try:
-                has_requests_in_progress = await asyncio.wait_for(
-                    self.engine_step(), ENGINE_ITERATION_TIMEOUT_S
-                )
+                await asyncio.wait_for(self.engine_step(), ENGINE_ITERATION_TIMEOUT_S)
             except asyncio.TimeoutError as exc:
                 logger.error("Engine iteration timed out. This should never happen!")
                 self.set_errored(exc)

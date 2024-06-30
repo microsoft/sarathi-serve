@@ -1,6 +1,6 @@
 import time
 from dataclasses import dataclass
-from queue import Queue
+from queue import Empty, Queue
 from threading import Event, Thread
 from typing import List
 
@@ -171,4 +171,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         """
         if not self.has_started_execution_loops:
             self.start_execution_loops()
-        return self.output_queue.get()
+        try:
+            return self.output_queue.get(block=False)
+        except Empty:
+            return []
