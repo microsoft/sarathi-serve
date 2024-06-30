@@ -47,7 +47,6 @@ class SchedulerOutputs:
     def __repr__(self) -> str:
         return (
             f"SchedulerOutputs(id={self.id}, "
-            f"new_seqs={self.new_seqs}, "
             f"ignored_seq_ids={self.ignored_seq_ids}, "
             f"preempted_seq_ids={self.preempted_seq_ids}, "
             f"scheduled_seq_metadata_list={self.scheduled_seq_metadata_list})"

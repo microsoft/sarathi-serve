@@ -344,8 +344,10 @@ class BaseLLMEngine:
         Finally, it decodes the sequences and returns the newly generated results.
         """
         start_time = time.perf_counter()
+
         with self._scheduler_timer:
             scheduler_outputs = self.scheduler.schedule()
+
         if scheduler_outputs.is_empty():
             return []
 

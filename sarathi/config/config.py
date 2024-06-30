@@ -166,7 +166,7 @@ class ParallelConfig:
         tensor_parallel_size: Number of tensor parallel groups.
     """
 
-    pipeline_parallel_size: int = 1
+    pipeline_parallel_size: int = 2
     tensor_parallel_size: int = 1
 
     def __post_init__(self):
