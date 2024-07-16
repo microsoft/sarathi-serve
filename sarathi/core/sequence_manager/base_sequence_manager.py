@@ -98,7 +98,10 @@ class BaseSequenceManager(ABC):
 
         if not seq.prompt_processing_finished:
             seq.update_prompt_tokens_processed(prompt_chunk_len)
-            return
+            # check the updated sequence status. if the sequence processing completes
+            # in this iteration we would want to append the token, else we can continue
+            if not seq.prompt_processing_finished:
+                return
 
         seq.append_token_id(sample.output_token)
         self._on_append_token(seq)
