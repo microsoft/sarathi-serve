@@ -1,8 +1,9 @@
 import json
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from collections import defaultdict, deque
-from dataclasses import MISSING, fields, make_dataclass
+from dataclasses import MISSING
 from dataclasses import field as dataclass_field
+from dataclasses import fields, make_dataclass
 from typing import Any, get_args
 
 from sarathi.config.base_poly_config import BasePolyConfig
@@ -81,7 +82,7 @@ def create_from_cli_args(cls) -> Any:
     for field in fields(cls):
         nargs = None
         field_type = field.type
-        help_text = field.metadata.get('help', None)
+        help_text = field.metadata.get("help", None)
 
         if is_list(field.type):
             assert is_composed_of_primitives(field.type)
@@ -97,8 +98,11 @@ def create_from_cli_args(cls) -> Any:
         # handle cases with default and default factory args
         if field.default is not MISSING:
             parser.add_argument(
-                f"--{field.name}", type=field_type, default=field.default, nargs=nargs,
-                help=help_text
+                f"--{field.name}",
+                type=field_type,
+                default=field.default,
+                nargs=nargs,
+                help=help_text,
             )
         elif field.default_factory is not MISSING:
             parser.add_argument(
@@ -110,7 +114,11 @@ def create_from_cli_args(cls) -> Any:
             )
         else:
             parser.add_argument(
-                f"--{field.name}", type=field_type, required=True, nargs=nargs, help=help_text
+                f"--{field.name}",
+                type=field_type,
+                required=True,
+                nargs=nargs,
+                help=help_text,
             )
 
     args = parser.parse_args()
@@ -151,7 +159,11 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
                 type_field_name = f"{field.name}_type"
                 default_value = field.default_factory().get_type()
                 meta_fields.append(
-                    (type_field_name, type(default_value), dataclass_field(default=default_value, metadata=field.metadata))
+                    (
+                        type_field_name,
+                        type(default_value),
+                        dataclass_field(default=default_value, metadata=field.metadata),
+                    )
                 )
 
                 assert hasattr(field_type, "__dataclass_fields__")
@@ -178,15 +190,30 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
 
             if field_default is not MISSING:
                 meta_fields.append(
-                    (prefixed_name, field_type, dataclass_field(default=field.default, metadata=field.metadata))
+                    (
+                        prefixed_name,
+                        field_type,
+                        dataclass_field(default=field.default, metadata=field.metadata),
+                    )
                 )
             elif field_default_factory is not MISSING:
                 meta_fields.append(
-                    (prefixed_name, field_type, dataclass_field(default_factory=field.default_factory, metadata=field.metadata))
+                    (
+                        prefixed_name,
+                        field_type,
+                        dataclass_field(
+                            default_factory=field.default_factory,
+                            metadata=field.metadata,
+                        ),
+                    )
                 )
             else:
                 meta_fields.append(
-                    (prefixed_name, field_type, dataclass_field(metadata=field.metadata))
+                    (
+                        prefixed_name,
+                        field_type,
+                        dataclass_field(metadata=field.metadata),
+                    )
                 )
 
             dataclass_args[_input_dataclass].append(

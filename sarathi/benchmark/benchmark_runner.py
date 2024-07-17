@@ -4,9 +4,9 @@ import os
 import time
 
 import ray
-import wandb
 from tqdm import tqdm
 
+import wandb
 from sarathi import LLMEngine, SamplingParams
 from sarathi.benchmark.config import BenchmarkConfig
 from sarathi.benchmark.entities import Request

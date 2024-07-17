@@ -12,9 +12,9 @@ import json
 import os
 import time
 
-import wandb
 import yaml
 
+import wandb
 from sarathi.benchmark.capacity_search.search_manager import SearchManager
 from sarathi.logger import init_logger
 
