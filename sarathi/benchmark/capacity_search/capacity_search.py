@@ -7,8 +7,8 @@ from subprocess import Popen
 
 import pandas as pd
 import ray
-import wandb
 
+import wandb
 from sarathi.benchmark.capacity_search.config import BenchmarkConfig, JobConfig
 from sarathi.benchmark.capacity_search.ray_utils import ResourceManager, get_ip
 from sarathi.logger import init_logger
