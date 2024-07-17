@@ -2,6 +2,7 @@ import json
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from collections import defaultdict, deque
 from dataclasses import MISSING, fields, make_dataclass
+from dataclasses import field as dataclass_field
 from typing import Any, get_args
 
 from sarathi.config.base_poly_config import BasePolyConfig
@@ -80,6 +81,7 @@ def create_from_cli_args(cls) -> Any:
     for field in fields(cls):
         nargs = None
         field_type = field.type
+        help_text = field.metadata.get('help', None)
 
         if is_list(field.type):
             assert is_composed_of_primitives(field.type)
@@ -95,7 +97,8 @@ def create_from_cli_args(cls) -> Any:
         # handle cases with default and default factory args
         if field.default is not MISSING:
             parser.add_argument(
-                f"--{field.name}", type=field_type, default=field.default, nargs=nargs
+                f"--{field.name}", type=field_type, default=field.default, nargs=nargs,
+                help=help_text
             )
         elif field.default_factory is not MISSING:
             parser.add_argument(
@@ -103,10 +106,11 @@ def create_from_cli_args(cls) -> Any:
                 type=field_type,
                 default=field.default_factory(),
                 nargs=nargs,
+                help=help_text,
             )
         else:
             parser.add_argument(
-                f"--{field.name}", type=field_type, required=True, nargs=nargs
+                f"--{field.name}", type=field_type, required=True, nargs=nargs, help=help_text
             )
 
     args = parser.parse_args()
@@ -119,8 +123,7 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
     Creates a new FlatClass type by recursively flattening the input dataclass.
     This allows for easy parsing of command line arguments along with storing/loading the configuration to/from a file.
     """
-    meta_fields_with_defaults = []
-    meta_fields_without_defaults = []
+    meta_fields = []
     processed_classes = set()
     dataclass_args = defaultdict(list)
     dataclass_dependencies = defaultdict(set)
@@ -147,8 +150,8 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
 
                 type_field_name = f"{field.name}_type"
                 default_value = field.default_factory().get_type()
-                meta_fields_with_defaults.append(
-                    (type_field_name, type(default_value), default_value)
+                meta_fields.append(
+                    (type_field_name, type(default_value), dataclass_field(default=default_value, metadata=field.metadata))
                 )
 
                 assert hasattr(field_type, "__dataclass_fields__")
@@ -174,15 +177,17 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
             )
 
             if field_default is not MISSING:
-                meta_fields_with_defaults.append(
-                    (prefixed_name, field_type, field_default)
+                meta_fields.append(
+                    (prefixed_name, field_type, dataclass_field(default=field.default, metadata=field.metadata))
                 )
             elif field_default_factory is not MISSING:
-                meta_fields_with_defaults.append(
-                    (prefixed_name, field_type, field_default_factory())
+                meta_fields.append(
+                    (prefixed_name, field_type, dataclass_field(default_factory=field.default_factory, metadata=field.metadata))
                 )
             else:
-                meta_fields_without_defaults.append((prefixed_name, field_type))
+                meta_fields.append(
+                    (prefixed_name, field_type, dataclass_field(metadata=field.metadata))
+                )
 
             dataclass_args[_input_dataclass].append(
                 (prefixed_name, field.name, field_type)
@@ -190,8 +195,10 @@ def create_flat_dataclass(input_dataclass: Any) -> Any:
 
     process_dataclass(input_dataclass)
 
-    meta_fields = meta_fields_without_defaults + meta_fields_with_defaults
-    FlatClass = make_dataclass("FlatClass", meta_fields)
+    # Sort fields to ensure non-default args come first
+    sorted_meta_fields = sorted(meta_fields, key=lambda x: x[2].default is not MISSING)
+
+    FlatClass = make_dataclass("FlatClass", sorted_meta_fields)
 
     # Metadata fields
     FlatClass.dataclass_args = dataclass_args

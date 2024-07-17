@@ -18,22 +18,38 @@ logger = init_logger(__name__)
 
 @dataclass
 class BaseRequestIntervalGeneratorConfig(BasePolyConfig):
-    seed: int = 42
+    seed: int = field(
+        default=42,
+        metadata={"help": "Random seed for the request interval generator."}
+    )
 
 
 @dataclass
 class BaseRequestLengthGeneratorConfig(BasePolyConfig):
-    seed: int = 42
+    seed: int = field(
+        default=42,
+        metadata={"help": "Random seed for the request length generator."}
+    )
 
 
 @dataclass
 class TraceRequestIntervalGeneratorConfig(BaseRequestIntervalGeneratorConfig):
-    trace_file: str = (
-        "data/processed_traces/AzureFunctionsInvocationTraceForTwoWeeksJan2021Processed.csv"
+    trace_file: str = field(
+        default="data/processed_traces/AzureFunctionsInvocationTraceForTwoWeeksJan2021Processed.csv",
+        metadata={"help": "Path to the trace file for request intervals."}
     )
-    start_time: str = "1970-01-04 12:00:00"
-    end_time: str = "1970-01-04 15:00:00"
-    time_scale_factor: float = 0.3
+    start_time: str = field(
+        default="1970-01-04 12:00:00",
+        metadata={"help": "Start time for the trace."}
+    )
+    end_time: str = field(
+        default="1970-01-04 15:00:00",
+        metadata={"help": "End time for the trace."}
+    )
+    time_scale_factor: float = field(
+        default=0.3,
+        metadata={"help": "Factor to scale the time intervals in the trace."}
+    )
 
     @staticmethod
     def get_type():
@@ -42,7 +58,10 @@ class TraceRequestIntervalGeneratorConfig(BaseRequestIntervalGeneratorConfig):
 
 @dataclass
 class PoissonRequestIntervalGeneratorConfig(BaseRequestIntervalGeneratorConfig):
-    qps: float = 1.0
+    qps: float = field(
+        default=1.0,
+        metadata={"help": "Queries per second for the Poisson distribution."}
+    )
 
     @staticmethod
     def get_type():
@@ -51,8 +70,14 @@ class PoissonRequestIntervalGeneratorConfig(BaseRequestIntervalGeneratorConfig):
 
 @dataclass
 class GammaRequestIntervalGeneratorConfig(BaseRequestIntervalGeneratorConfig):
-    qps: float = 1.0
-    cv: float = 0.5
+    qps: float = field(
+        default=1.0,
+        metadata={"help": "Queries per second for the Gamma distribution."}
+    )
+    cv: float = field(
+        default=0.5,
+        metadata={"help": "Coefficient of variation for the Gamma distribution."}
+    )
 
     @staticmethod
     def get_type():
@@ -68,12 +93,22 @@ class StaticRequestIntervalGeneratorConfig(BaseRequestIntervalGeneratorConfig):
 
 @dataclass
 class TraceRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
-    trace_file: str = (
-        "data/processed_traces/sharegpt_8k_filtered_stats_llama2_tokenizer.csv"
+    trace_file: str = field(
+        default="data/processed_traces/sharegpt_8k_filtered_stats_llama2_tokenizer.csv",
+        metadata={"help": "Path to the trace file for request lengths."}
     )
-    prefill_scale_factor: float = 1
-    decode_scale_factor: float = 1
-    max_tokens: int = 4096
+    prefill_scale_factor: float = field(
+        default=1,
+        metadata={"help": "Scale factor for prefill tokens."}
+    )
+    decode_scale_factor: float = field(
+        default=1,
+        metadata={"help": "Scale factor for decode tokens."}
+    )
+    max_tokens: int = field(
+        default=4096,
+        metadata={"help": "Maximum number of tokens allowed."}
+    )
 
     @staticmethod
     def get_type():
@@ -82,11 +117,26 @@ class TraceRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
 
 @dataclass
 class ZipfRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
-    theta: float = 0.6
-    scramble: bool = False
-    min_tokens: int = 1024
-    max_tokens: int = 4096
-    prefill_to_decode_ratio: float = 20.0
+    theta: float = field(
+        default=0.6,
+        metadata={"help": "Theta parameter for the Zipf distribution."}
+    )
+    scramble: bool = field(
+        default=False,
+        metadata={"help": "Whether to scramble the Zipf distribution."}
+    )
+    min_tokens: int = field(
+        default=1024,
+        metadata={"help": "Minimum number of tokens."}
+    )
+    max_tokens: int = field(
+        default=4096,
+        metadata={"help": "Maximum number of tokens."}
+    )
+    prefill_to_decode_ratio: float = field(
+        default=20.0,
+        metadata={"help": "Ratio of prefill tokens to decode tokens."}
+    )
 
     @staticmethod
     def get_type():
@@ -95,9 +145,18 @@ class ZipfRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
 
 @dataclass
 class UniformRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
-    min_tokens: int = 1024
-    max_tokens: int = 4096
-    prefill_to_decode_ratio: float = 20.0
+    min_tokens: int = field(
+        default=1024,
+        metadata={"help": "Minimum number of tokens."}
+    )
+    max_tokens: int = field(
+        default=4096,
+        metadata={"help": "Maximum number of tokens."}
+    )
+    prefill_to_decode_ratio: float = field(
+        default=20.0,
+        metadata={"help": "Ratio of prefill tokens to decode tokens."}
+    )
 
     @staticmethod
     def get_type():
@@ -106,8 +165,14 @@ class UniformRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
 
 @dataclass
 class FixedRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
-    prefill_tokens: int = 4096
-    decode_tokens: int = 512
+    prefill_tokens: int = field(
+        default=4096,
+        metadata={"help": "Number of prefill tokens."}
+    )
+    decode_tokens: int = field(
+        default=512,
+        metadata={"help": "Number of decode tokens."}
+    )
 
     @staticmethod
     def get_type():
@@ -116,7 +181,10 @@ class FixedRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
 
 @dataclass
 class BaseRequestGeneratorConfig(BasePolyConfig):
-    seed: int = 42
+    seed: int = field(
+        default=42,
+        metadata={"help": "Random seed for the request generator."}
+    )
 
 
 @dataclass
@@ -127,8 +195,14 @@ class SyntheticRequestGeneratorConfig(BaseRequestGeneratorConfig):
     interval_generator_config: BaseRequestIntervalGeneratorConfig = field(
         default_factory=PoissonRequestIntervalGeneratorConfig
     )
-    num_requests: int = 64
-    duration: float = None
+    num_requests: int = field(
+        default=64,
+        metadata={"help": "Number of requests to generate."}
+    )
+    duration: float = field(
+        default=None,
+        metadata={"help": "Duration of the synthetic request generation."}
+    )
 
     @staticmethod
     def get_type():
@@ -137,12 +211,30 @@ class SyntheticRequestGeneratorConfig(BaseRequestGeneratorConfig):
 
 @dataclass
 class TraceRequestGeneratorConfig(BaseRequestGeneratorConfig):
-    trace_file: str = "data/processed_traces/sydney_enterprise.csv"
-    date: str = "2023-08-21"
-    prefill_scale_factor: float = 0.3
-    decode_scale_factor: float = 1
-    time_scale_factor: float = 0.04
-    max_tokens: int = 4096
+    trace_file: str = field(
+        default="data/processed_traces/sydney_enterprise.csv",
+        metadata={"help": "Path to the trace file for request generation."}
+    )
+    date: str = field(
+        default="2023-08-21",
+        metadata={"help": "Date for the trace data."}
+    )
+    prefill_scale_factor: float = field(
+        default=0.3,
+        metadata={"help": "Scale factor for prefill tokens."}
+    )
+    decode_scale_factor: float = field(
+        default=1,
+        metadata={"help": "Scale factor for decode tokens."}
+    )
+    time_scale_factor: float = field(
+        default=0.04,
+        metadata={"help": "Scale factor for time intervals."}
+    )
+    max_tokens: int = field(
+        default=4096,
+        metadata={"help": "Maximum number of tokens allowed."}
+    )
 
     @staticmethod
     def get_type():
@@ -151,13 +243,34 @@ class TraceRequestGeneratorConfig(BaseRequestGeneratorConfig):
 
 @dataclass
 class BenchmarkConfig(BaseEndpointConfig):
-    seed: int = 42
-    output_dir: str = "benchmark_output"
-    write_json_trace: bool = True
-    enable_profiling: bool = False
-    time_limit: Optional[int] = None
-    num_replicas: int = 1
-    replica_resource_mapping: Optional[ReplicaResourceMapping] = None
+        seed: int = field(
+        default=42,
+        metadata={"help": "Random seed for the benchmark."}
+    )
+    output_dir: str = field(
+        default="benchmark_output",
+        metadata={"help": "Directory to store benchmark output."}
+    )
+    write_json_trace: bool = field(
+        default=True,
+        metadata={"help": "Whether to write JSON trace output."}
+    )
+    enable_profiling: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable profiling."}
+    )
+    time_limit: Optional[int] = field(
+        default=None,
+        metadata={"help": "Time limit for the benchmark in seconds."}
+    )
+    num_replicas: int = field(
+        default=1,
+        metadata={"help": "Number of replicas to use."}
+    )
+    replica_resource_mapping: Optional[ReplicaResourceMapping] = field(
+        default=None,
+        metadata={"help": "Mapping of replicas to resources."}
+    )
     request_generator_config: BaseRequestGeneratorConfig = field(
         default_factory=SyntheticRequestGeneratorConfig
     )
