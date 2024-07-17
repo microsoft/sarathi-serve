@@ -15,43 +15,38 @@ logger = init_logger(__name__)
 
 @dataclass
 class ModelConfig:
-    """Configuration for the model.
-
-    Args:
-        model: Name or path of the huggingface model to use.
-        trust_remote_code: Trust remote code (e.g., from HuggingFace) when
-            downloading the model and tokenizer.
-        download_dir: Directory to download and load the weights, default to the
-            default cache directory of huggingface.
-        load_format: The format of the model weights to load:
-            "auto" will try to load the weights in the safetensors format and
-                fall back to the pytorch bin format if safetensors format is
-                not available.
-            "pt" will load the weights in the pytorch bin format.
-            "safetensors" will load the weights in the safetensors format.
-            "npcache" will load the weights in pytorch format and store
-                a numpy cache to speed up the loading.
-            "dummy" will initialize the weights with random values, which is
-                mainly for profiling.
-        dtype: Data type for model weights and activations. The "auto" option
-            will use FP16 precision for FP32 and FP16 models, and BF16 precision
-            for BF16 models.
-        seed: Random seed for reproducibility.
-        revision: The specific model version to use. It can be a branch name,
-            a tag name, or a commit id. If unspecified, will use the default
-            version.
-        max_model_len: Maximum length of a sequence (including prompt and
-            output). If None, will be derived from the model.
-    """
-
-    model: str = "meta-llama/Meta-Llama-3-8B-Instruct"
-    trust_remote_code: bool = True
-    download_dir: Optional[str] = None
-    load_format: str = "auto"
-    dtype: str = "float16"
-    seed: int = 0
-    revision: Optional[str] = None
-    max_model_len: Optional[int] = None
+    model: str = field(
+        default="meta-llama/Meta-Llama-3-8B-Instruct",
+        metadata={"help": "Name or path of the huggingface model to use."}
+    )
+    trust_remote_code: bool = field(
+        default=True,
+        metadata={"help": "Trust remote code (e.g., from HuggingFace) when downloading the model and tokenizer."}
+    )
+    download_dir: Optional[str] = field(
+        default=None,
+        metadata={"help": "Directory to download and load the weights, default to the default cache directory of huggingface."}
+    )
+    load_format: str = field(
+        default="auto",
+        metadata={"help": "The format of the model weights to load: 'auto', 'pt', 'safetensors', 'npcache', or 'dummy'."}
+    )
+    dtype: str = field(
+        default="float16",
+        metadata={"help": "Data type for model weights and activations. 'auto' will use FP16 for FP32 and FP16 models, and BF16 for BF16 models."}
+    )
+    seed: int = field(
+        default=0,
+        metadata={"help": "Random seed for reproducibility."}
+    )
+    revision: Optional[str] = field(
+        default=None,
+        metadata={"help": "The specific model version to use. Can be a branch name, tag name, or commit id."}
+    )
+    max_model_len: Optional[int] = field(
+        default=None,
+        metadata={"help": "Maximum length of a sequence (including prompt and output). If None, will be derived from the model."}
+    )
 
     def __post_init__(self):
         self.hf_config = get_config(self.model, self.trust_remote_code, self.revision)
@@ -146,28 +141,25 @@ class ModelConfig:
 
 @dataclass
 class CacheConfig:
-    """Configuration for the KV cache.
-
-    Args:
-        block_size: Size of a cache block in number of tokens.
-    """
-
-    block_size: int = 16
-    # this gets set after profiling
-    num_gpu_blocks: Optional[int] = None
-
+    block_size: int = field(
+        default=16,
+        metadata={"help": "Size of a cache block in number of tokens."}
+    )
+    num_gpu_blocks: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of GPU blocks for caching. This gets set after profiling."}
+    )
 
 @dataclass
 class ParallelConfig:
-    """Configuration for the distributed execution.
-
-    Args:
-        pipeline_parallel_size: Number of pipeline parallel groups.
-        tensor_parallel_size: Number of tensor parallel groups.
-    """
-
-    pipeline_parallel_size: int = 2
-    tensor_parallel_size: int = 1
+    pipeline_parallel_size: int = field(
+        default=2,
+        metadata={"help": "Number of pipeline parallel groups."}
+    )
+    tensor_parallel_size: int = field(
+        default=1,
+        metadata={"help": "Number of tensor parallel groups."}
+    )
 
     def __post_init__(self):
         self.world_size = self.pipeline_parallel_size * self.tensor_parallel_size
@@ -175,17 +167,14 @@ class ParallelConfig:
 
 @dataclass
 class BaseSchedulerConfig(BasePolyConfig):
-    """BaseScheduler configuration.
-
-    Args:
-        max_num_seqs: Maximum number of sequences to be processed in a single
-            iteration. Aka batch size.
-        max_model_len: Maximum length of a sequence (including prompt
-            and generated text).
-    """
-
-    max_num_seqs: int = 128
-    num_pipeline_stages: int = 1
+    max_num_seqs: int = field(
+        default=128,
+        metadata={"help": "Maximum number of sequences to be processed in a single iteration (batch size)."}
+    )
+    num_pipeline_stages: int = field(
+        default=1,
+        metadata={"help": "Number of pipeline stages."}
+    )
 
     @abstractmethod
     def get_max_num_batched_tokens(self, max_model_len: int):
@@ -194,8 +183,10 @@ class BaseSchedulerConfig(BasePolyConfig):
 
 @dataclass
 class VllmSchedulerConfig(BaseSchedulerConfig):
-
-    max_batched_tokens: Optional[int] = None
+    max_batched_tokens: Optional[int] = field(
+        default=None,
+        metadata={"help": "Maximum number of batched tokens."}
+    )
 
     def get_max_num_batched_tokens(self, max_model_len: int):
         if self.max_batched_tokens:
@@ -209,7 +200,10 @@ class VllmSchedulerConfig(BaseSchedulerConfig):
 
 @dataclass
 class SimpleChunkingSchedulerConfig(BaseSchedulerConfig):
-    chunk_size: int = 512
+    chunk_size: int = field(
+        default=512,
+        metadata={"help": "Size of each chunk for simple chunking scheduler."}
+    )
 
     def get_max_num_batched_tokens(self, max_model_len: int):
         return self.chunk_size
@@ -243,12 +237,30 @@ class FasterTransformerSchedulerConfig(BaseSchedulerConfig):
 
 @dataclass
 class SarathiSchedulerConfig(BaseSchedulerConfig):
-    chunk_size: int = 512
-    enable_dynamic_chunking_schedule: bool = False
-    low_chunk_size: Optional[int] = None
-    high_chunk_size: Optional[int] = None
-    chunk_schedule_max_tokens: Optional[int] = None
-    chunk_schedule_stages: Optional[int] = None
+    chunk_size: int = field(
+        default=512,
+        metadata={"help": "Size of each chunk for Sarathi scheduler."}
+    )
+    enable_dynamic_chunking_schedule: bool = field(
+        default=False,
+        metadata={"help": "Enable dynamic chunking schedule."}
+    )
+    low_chunk_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Minimum chunk size for dynamic chunking."}
+    )
+    high_chunk_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Maximum chunk size for dynamic chunking."}
+    )
+    chunk_schedule_max_tokens: Optional[int] = field(
+        default=None,
+        metadata={"help": "Maximum number of tokens for chunk scheduling."}
+    )
+    chunk_schedule_stages: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of stages for chunk scheduling."}
+    )
 
     def get_max_num_batched_tokens(self, max_model_len: int):
         # Sarathi never schedules more than chunk_size tokens in one iteration.
@@ -266,24 +278,66 @@ class SarathiSchedulerConfig(BaseSchedulerConfig):
 class MetricsConfig:
     """Metric configuration."""
 
-    write_metrics: bool = True
-    wandb_project: Optional[str] = None
-    wandb_group: Optional[str] = None
-    wandb_run_name: Optional[str] = None
-    wandb_sweep_id: Optional[str] = None
-    wandb_run_id: Optional[str] = None
-    enable_op_level_metrics: bool = False
-    enable_cpu_op_level_metrics: bool = False
-    enable_chrome_trace: bool = True
-    enable_request_outputs: bool = False
-    keep_individual_batch_metrics: bool = False
+    write_metrics: bool = field(
+        default=True,
+        metadata={"help": "Whether to write metrics."}
+    )
+    wandb_project: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases project name."}
+    )
+    wandb_group: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases group name."}
+    )
+    wandb_run_name: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases run name."}
+    )
+    wandb_sweep_id: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases sweep ID."}
+    )
+    wandb_run_id: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases run ID."}
+    )
+    enable_op_level_metrics: bool = field(
+        default=False,
+        metadata={"help": "Enable operation-level metrics."}
+    )
+    enable_cpu_op_level_metrics: bool = field(
+        default=False,
+        metadata={"help": "Enable CPU operation-level metrics."}
+    )
+    enable_chrome_trace: bool = field(
+        default=True,
+        metadata={"help": "Enable Chrome tracing."}
+    )
+    enable_request_outputs: bool = field(
+        default=False,
+        metadata={"help": "Enable request outputs."}
+    )
+    keep_individual_batch_metrics: bool = field(
+        default=False,
+        metadata={"help": "Keep individual batch metrics."}
+    )
 
 
 @dataclass
 class ReplicaConfig:
-    replica_id: int = 0
-    output_dir: str = "."
-    resource_mapping: Optional[ResourceMapping] = None
+    replica_id: int = field(
+        default=0,
+        metadata={"help": "ID of the replica."}
+    )
+    output_dir: str = field(
+        default=".",
+        metadata={"help": "Output directory for the replica."}
+    )
+    resource_mapping: Optional[ResourceMapping] = field(
+        default=None,
+        metadata={"help": "Resource mapping for the replica."}
+    )
 
     def __post_init__(self):
         self.output_dir = f"{self.output_dir}/replica_{self.replica_id}"
@@ -298,8 +352,14 @@ class ReplicaConfig:
 
 @dataclass
 class WorkerConfig:
-    gpu_memory_utilization: float = 0.8
-    attention_backend: AttentionBackend = AttentionBackend.FLASHINFER
+    gpu_memory_utilization: float = field(
+        default=0.8,
+        metadata={"help": "GPU memory utilization fraction (0.0 to 1.0)."}
+    )
+    attention_backend: AttentionBackend = field(
+        default=AttentionBackend.FLASHINFER,
+        metadata={"help": "Backend to use for attention computation."}
+    )
 
     def __post_init__(self):
         self._verify_args()
@@ -327,8 +387,14 @@ class SystemConfig:
 
 @dataclass
 class BaseEndpointConfig(ABC):
-    log_level: str = "info"
-    output_dir: str = "output"
+    log_level: str = field(
+        default="info",
+        metadata={"help": "Logging level."}
+    )
+    output_dir: str = field(
+        default="output",
+        metadata={"help": "Output directory."}
+    )
     model_config: ModelConfig = field(default_factory=ModelConfig)
     worker_config: WorkerConfig = field(default_factory=WorkerConfig)
     cache_config: CacheConfig = field(default_factory=CacheConfig)
