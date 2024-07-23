@@ -7,6 +7,7 @@ from sarathi.core.datatypes.sequence import Sequence
 
 
 class OrcaBlockSpaceManager(BaseBlockSpaceManager):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.watermark_blocks = 0

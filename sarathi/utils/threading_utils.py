@@ -20,6 +20,7 @@ def synchronized(method):
 
 
 def exit_on_error(func):
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:

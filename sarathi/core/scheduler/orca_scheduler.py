@@ -14,6 +14,7 @@ logger = init_logger(__name__)
 
 
 class OrcaScheduler(BaseScheduler):
+
     def __init__(
         self,
         model_config: ModelConfig,

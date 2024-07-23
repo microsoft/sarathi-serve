@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class Request(BaseEntity):
+
     def __init__(
         self,
         arrived_at: float,

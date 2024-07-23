@@ -5,6 +5,7 @@ from sarathi.benchmark.config import BaseRequestLengthGeneratorConfig
 
 
 class BaseRequestLengthGenerator(ABC):
+
     def __init__(self, config: BaseRequestLengthGeneratorConfig):
         self.config = config
 

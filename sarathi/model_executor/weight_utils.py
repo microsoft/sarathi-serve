@@ -19,6 +19,7 @@ logger = init_logger(__name__)
 
 
 class Disabledtqdm(tqdm):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, disable=True)
 

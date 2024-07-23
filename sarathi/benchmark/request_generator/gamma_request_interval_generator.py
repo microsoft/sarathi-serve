@@ -7,6 +7,7 @@ from sarathi.benchmark.request_generator.base_request_interval_generator import 
 
 
 class GammaRequestIntervalGenerator(BaseRequestIntervalGenerator):
+
     def __init__(self, config: GammaRequestIntervalGeneratorConfig):
         super().__init__(config)
 

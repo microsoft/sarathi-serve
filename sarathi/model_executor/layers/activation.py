@@ -25,6 +25,7 @@ class SiluAndMul(nn.Module):
 
 
 class NewGELU(nn.Module):
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         num_tokens = x.shape[0]
         d = x.shape[1]
@@ -34,6 +35,7 @@ class NewGELU(nn.Module):
 
 
 class FastGELU(nn.Module):
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         num_tokens = x.shape[0]
         d = x.shape[1]

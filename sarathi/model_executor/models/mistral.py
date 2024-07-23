@@ -59,6 +59,7 @@ from sarathi.worker.cache_engine import KVCache
 
 
 class MistralMLP(nn.Module):
+
     def __init__(
         self,
         hidden_size: int,
@@ -102,6 +103,7 @@ class MistralMLP(nn.Module):
 
 
 class MistralAttention(nn.Module):
+
     def __init__(
         self,
         hidden_size: int,
@@ -176,6 +178,7 @@ class MistralAttention(nn.Module):
 
 
 class MistralDecoderLayer(nn.Module):
+
     def __init__(
         self,
         config: MistralConfig,
@@ -228,6 +231,7 @@ class MistralDecoderLayer(nn.Module):
 
 
 class MistralModel(nn.Module):
+
     def __init__(
         self,
         config: MistralConfig,
@@ -283,6 +287,7 @@ class MistralModel(nn.Module):
 
 
 class MistralForCausalLM(nn.Module):
+
     def __init__(
         self,
         config: MistralConfig,

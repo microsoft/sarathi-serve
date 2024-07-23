@@ -16,6 +16,7 @@ logger = init_logger(__name__)
 
 
 class SarathiScheduler(BaseScheduler):
+
     def __init__(
         self,
         model_config: ModelConfig,

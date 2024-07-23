@@ -21,6 +21,7 @@ class Turn(Enum):
 
 
 class SimpleChunkingScheduler(BaseScheduler):
+
     def __init__(
         self,
         model_config: ModelConfig,

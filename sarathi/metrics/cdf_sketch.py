@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class CDFSketch:
+
     def __init__(
         self,
         metric_name: str,

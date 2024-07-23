@@ -2,7 +2,7 @@
 
 from queue import Queue
 from threading import Thread
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple, List
 
 import torch
 import torch.distributed
@@ -55,7 +55,9 @@ class PipelineParallelWorker(BaseWorker):
         pending_step_outputs: List[Tuple[SchedulerOutputs, SamplerOutputs]] = [],
     ) -> None:
         for pending_step_output in pending_step_outputs:
-            self.on_sampling_completed(pending_step_output[0], pending_step_output[1])
+            self.on_sampling_completed(
+                pending_step_output[0], pending_step_output[1]
+            )
 
         self.execution_queue.put(scheduler_outputs)
 

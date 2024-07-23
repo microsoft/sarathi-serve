@@ -7,6 +7,7 @@ from sarathi.benchmark.entities import Request
 
 
 class BaseRequestGenerator(ABC):
+
     def __init__(self, config: BaseRequestGeneratorConfig):
         self.config = config
 

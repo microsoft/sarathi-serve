@@ -224,6 +224,7 @@ class SimpleChunkingSchedulerConfig(BaseSchedulerConfig):
 
 @dataclass
 class OrcaSchedulerConfig(BaseSchedulerConfig):
+
     def get_max_num_batched_tokens(self, max_model_len: int):
         return self.max_num_seqs * max_model_len
 
@@ -234,6 +235,7 @@ class OrcaSchedulerConfig(BaseSchedulerConfig):
 
 @dataclass
 class FasterTransformerSchedulerConfig(BaseSchedulerConfig):
+
     def get_max_num_batched_tokens(self, max_model_len: int):
         return self.max_num_seqs * max_model_len
 

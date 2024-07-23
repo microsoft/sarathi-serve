@@ -35,6 +35,7 @@ def get_ready_promises(promises):
 
 @ray.remote
 class ResourceManager:
+
     def __init__(self):
         self._nodes = get_nodes()
         self._num_nodes = len(self._nodes)
@@ -121,6 +122,7 @@ class ResourceManager:
 
 
 class RayParallelRunner:
+
     def __init__(self):
         self._resource_manager = ResourceManager.remote()
 

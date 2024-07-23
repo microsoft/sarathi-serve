@@ -4,6 +4,7 @@ EPS = 1e-8
 
 
 class ZipfGenerator:
+
     def __init__(
         self, min: int, max: int, theta: float, scramble: bool, seed: int
     ) -> None:

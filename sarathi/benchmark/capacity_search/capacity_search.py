@@ -18,6 +18,7 @@ logger = init_logger(__name__)
 
 
 def release_resources_on_failure(func):
+
     def wrapper(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
@@ -29,6 +30,7 @@ def release_resources_on_failure(func):
 
 
 class CapacitySearch:
+
     def __init__(
         self,
         job_config: JobConfig,

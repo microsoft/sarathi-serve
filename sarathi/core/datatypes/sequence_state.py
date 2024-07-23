@@ -5,6 +5,7 @@ from sarathi.core.datatypes.sequence_status import SequenceStatus
 
 
 class SequenceState:
+
     def __init__(self, id: str, arrived_at: float, num_prompt_tokens: int):
         self._id = id
         self._arrived_at: float = arrived_at

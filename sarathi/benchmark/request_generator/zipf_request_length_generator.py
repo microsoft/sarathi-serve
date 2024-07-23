@@ -8,6 +8,7 @@ from sarathi.benchmark.utils.zipf_generator import ZipfGenerator
 
 
 class ZipfRequestLengthGenerator(BaseRequestLengthGenerator):
+
     def __init__(self, config: ZipfRequestLengthGeneratorConfig):
         super().__init__(config)
 

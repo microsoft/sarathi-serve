@@ -4,6 +4,7 @@ from sarathi.benchmark.config import BaseRequestIntervalGeneratorConfig
 
 
 class BaseRequestIntervalGenerator(ABC):
+
     def __init__(self, config: BaseRequestIntervalGeneratorConfig):
         self.config = config
 
