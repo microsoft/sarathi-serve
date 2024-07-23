@@ -35,7 +35,7 @@ model_config = ModelConfig(
 
 parallel_config = ParallelConfig(
     tensor_parallel_size=1,
-    pipeline_parallel_size=1,
+    pipeline_parallel_size=4,
 )
 
 scheduler_config = SarathiSchedulerConfig(
@@ -78,6 +78,7 @@ def generate(
             if output.finished:
                 outputs.append(output)
                 pbar.update(1)
+
     pbar.close()
     # Sort the outputs by request ID.
     # This is necessary because some requests may be finished earlier than

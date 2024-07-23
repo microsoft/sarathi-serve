@@ -2,7 +2,7 @@
 
 from queue import Queue
 from threading import Thread
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import torch
 import torch.distributed
@@ -52,7 +52,13 @@ class PipelineParallelWorker(BaseWorker):
     def enqueue(
         self,
         scheduler_outputs: SchedulerOutputs,
+        pending_step_outputs: List[Tuple[SchedulerOutputs, SamplerOutputs]] = [],
     ) -> None:
+        for pending_step_output in pending_step_outputs:
+            self.on_sampling_completed(
+                pending_step_output[0], pending_step_output[1]
+            )
+
         self.execution_queue.put(scheduler_outputs)
 
     def on_step_completed(
@@ -79,8 +85,10 @@ class PipelineParallelWorker(BaseWorker):
             if not self.is_tensor_parallel_rank_zero:
                 continue
 
-            if self.is_first_pipeline_stage or self.is_last_pipeline_stage:
+            if self.is_last_pipeline_stage:
                 self.output_queue.put(output)
+            elif self.is_first_pipeline_stage:
+                self.output_queue.put(None)
 
     def get_output(self) -> Optional[SamplerOutputs]:
         return self.output_queue.get()
