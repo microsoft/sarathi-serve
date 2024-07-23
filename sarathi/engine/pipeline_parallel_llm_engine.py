@@ -93,7 +93,9 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         self.pending_step_outputs.append((scheduler_outputs, sampler_outputs))
 
     @synchronized
-    def _get_pending_step_outputs(self) -> List[Tuple[SchedulerOutputs, SamplerOutputs]]:
+    def _get_pending_step_outputs(
+        self,
+    ) -> List[Tuple[SchedulerOutputs, SamplerOutputs]]:
         pending_step_outputs = self.pending_step_outputs
         self.pending_step_outputs = []
         return pending_step_outputs

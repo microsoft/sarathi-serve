@@ -230,7 +230,9 @@ class _AsyncLLMEngine(LLMEngine):
         """
         Simple wrapper around the synchronous `step` method to make it
         """
-        return await asyncio.get_event_loop().run_in_executor(None, self.engine.step, False)
+        return await asyncio.get_event_loop().run_in_executor(
+            None, self.engine.step, False
+        )
 
 
 class AsyncLLMEngine(LLMEngine):
