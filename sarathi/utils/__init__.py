@@ -40,13 +40,17 @@ def random_uuid() -> str:
     return str(uuid.uuid4().hex)
 
 
-def in_wsl() -> bool:
-    # Reference: https://github.com/microsoft/WSL/issues/4071
-    return "microsoft" in " ".join(uname()).lower()
-
-
 def get_ip() -> str:
-    return socket.gethostbyname(socket.gethostname())
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        s.connect(("10.254.254.254", 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
 
 
 def get_open_port() -> int:

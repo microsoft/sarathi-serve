@@ -2,15 +2,15 @@ import time
 from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Event, Thread
-from typing import List
+from typing import List, Tuple
 
 from sarathi.config import SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.datatypes.sequence import SequenceMetadata
+from sarathi.core.datatypes.sequence import SamplerOutputs, SequenceMetadata
 from sarathi.engine.base_llm_engine import BaseLLMEngine
 from sarathi.logger import init_logger
-from sarathi.utils.threading_utils import exit_on_error
+from sarathi.utils.threading_utils import exit_on_error, synchronized
 
 logger = init_logger(__name__)
 
@@ -59,6 +59,8 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
             target=self._scheduler_timer_loop, daemon=True
         )
 
+        self.pending_step_outputs: List[Tuple[SchedulerOutputs, SamplerOutputs]] = []
+
     def _validate_parallel_config(self) -> None:
         assert self.config.parallel_config.pipeline_parallel_size > 1
 
@@ -83,6 +85,20 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         from sarathi.worker.pipeline_parallel_worker import PipelineParallelWorker
 
         return PipelineParallelWorker
+
+    @synchronized
+    def _append_pending_step_output(
+        self, scheduler_outputs: SchedulerOutputs, sampler_outputs: SamplerOutputs
+    ) -> None:
+        self.pending_step_outputs.append((scheduler_outputs, sampler_outputs))
+
+    @synchronized
+    def _get_pending_step_outputs(
+        self,
+    ) -> List[Tuple[SchedulerOutputs, SamplerOutputs]]:
+        pending_step_outputs = self.pending_step_outputs
+        self.pending_step_outputs = []
+        return pending_step_outputs
 
     @exit_on_error
     def _schedule_loop(self) -> None:
@@ -110,15 +126,17 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
                 )
             )
 
+            end_time = time.perf_counter()
+
             if not scheduler_outputs.is_empty():
                 self.microbatch_watch_event.set()
                 self._run_workers(
                     "enqueue",
                     scheduler_outputs=scheduler_outputs,
+                    pending_step_outputs=self._get_pending_step_outputs(),
                     ignore_output=True,
                 )
 
-            end_time = time.perf_counter()
             self.metrics_store.on_schedule(seq_metadata_list, start_time, end_time)
 
     @exit_on_error
@@ -146,11 +164,8 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
                 "get_output",
             )
 
-            # this needs to be optimized
-            self._run_workers(
-                "on_sampling_completed",
-                scheduler_outputs=scheduler_stage_output.scheduler_outputs,
-                sampler_outputs=sampler_outputs,
+            self._append_pending_step_output(
+                scheduler_stage_output.scheduler_outputs, sampler_outputs
             )
 
             all_request_outputs = self._on_step_completed(
@@ -161,9 +176,10 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
                 scheduler_stage_output.start_time,
             )
             self.schedule_event.set()
+
             self.output_queue.put(all_request_outputs)
 
-    def step(self) -> List[RequestOutput]:
+    def step(self, block: bool = True) -> List[RequestOutput]:
         """Performs one decoding iteration and returns newly generated results.
 
         This function performs one decoding iteration of the engine.
@@ -171,6 +187,10 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         """
         if not self.has_started_execution_loops:
             self.start_execution_loops()
+
+        if block:
+            return self.output_queue.get()
+
         try:
             return self.output_queue.get(block=False)
         except Empty:

@@ -7,7 +7,6 @@ import torch
 from sarathi.config import ModelConfig, ParallelConfig, SystemConfig
 from sarathi.logger import init_logger
 from sarathi.model_executor.attention import get_attention_wrapper
-from sarathi.utils import in_wsl
 
 logger = init_logger(__name__)
 
