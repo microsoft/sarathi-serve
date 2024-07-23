@@ -54,7 +54,6 @@ class ChatMessageParseResult:
 
 
 class OpenAIServingChat(OpenAIServing):
-
     def __init__(
         self,
         engine: AsyncLLMEngine,

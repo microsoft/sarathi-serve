@@ -129,7 +129,6 @@ class ParallelConfig:
 
 
 class JobConfig:
-
     def __init__(
         self,
         model_config: ModelConfig,
@@ -187,12 +186,7 @@ class JobConfig:
     @classmethod
     def generate_job_configs(cls, config: dict):
         job_configs = []
-        for (
-            model_config,
-            trace_config,
-            scheduler_config,
-            parallel_config,
-        ) in product(
+        for (model_config, trace_config, scheduler_config, parallel_config,) in product(
             config["models"],
             config["traces"],
             config["schedulers"],

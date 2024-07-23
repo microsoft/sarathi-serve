@@ -30,7 +30,6 @@ from sarathi.worker.cache_engine import KVCache
 
 
 class InternLMMLP(nn.Module):
-
     def __init__(
         self,
         hidden_size: int,
@@ -73,7 +72,6 @@ class InternLMMLP(nn.Module):
 
 
 class InternLMAttention(nn.Module):
-
     def __init__(
         self,
         hidden_size: int,
@@ -146,7 +144,6 @@ class InternLMAttention(nn.Module):
 
 
 class InternLMDecoderLayer(nn.Module):
-
     def __init__(self, config: LlamaConfig):
         super().__init__()
         rope_theta = getattr(config, "rope_theta", 10000)
@@ -195,7 +192,6 @@ class InternLMDecoderLayer(nn.Module):
 
 
 class InternLMModel(nn.Module):
-
     def __init__(self, config: LlamaConfig):
         super().__init__()
         self.config = config
@@ -230,7 +226,6 @@ class InternLMModel(nn.Module):
 
 
 class InternLMForCausalLM(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.config = config

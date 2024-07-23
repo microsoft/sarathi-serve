@@ -59,7 +59,6 @@ from sarathi.worker.cache_engine import KVCache
 
 
 class YiMLP(nn.Module):
-
     def __init__(
         self,
         hidden_size: int,
@@ -100,7 +99,6 @@ class YiMLP(nn.Module):
 
 
 class YiAttention(nn.Module):
-
     def __init__(
         self,
         hidden_size: int,
@@ -183,7 +181,6 @@ class YiAttention(nn.Module):
 
 
 class YiDecoderLayer(nn.Module):
-
     def __init__(
         self,
         config: YiConfig,
@@ -235,7 +232,6 @@ class YiDecoderLayer(nn.Module):
 
 
 class YiModel(nn.Module):
-
     def __init__(
         self,
         config: YiConfig,
@@ -288,7 +284,6 @@ class YiModel(nn.Module):
 
 
 class YiForCausalLM(nn.Module):
-
     def __init__(
         self,
         config: YiConfig,

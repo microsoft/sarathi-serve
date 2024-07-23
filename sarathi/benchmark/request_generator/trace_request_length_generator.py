@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class TraceRequestLengthGenerator(BaseRequestLengthGenerator):
-
     def __init__(self, config: TraceRequestLengthGeneratorConfig):
         super().__init__(config)
 

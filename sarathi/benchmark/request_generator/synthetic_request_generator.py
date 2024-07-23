@@ -15,7 +15,6 @@ from sarathi.benchmark.utils.random import set_seeds
 
 
 class SyntheticRequestGenerator(BaseRequestGenerator):
-
     def __init__(self, config: SyntheticRequestGeneratorConfig):
         super().__init__(config)
 

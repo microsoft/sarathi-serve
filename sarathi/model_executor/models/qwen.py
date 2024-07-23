@@ -43,7 +43,6 @@ from sarathi.worker.cache_engine import KVCache
 
 
 class QWenMLP(nn.Module):
-
     def __init__(
         self,
         hidden_size: int,
@@ -86,7 +85,6 @@ class QWenMLP(nn.Module):
 
 
 class QWenAttention(nn.Module):
-
     def __init__(
         self,
         hidden_size: int,
@@ -159,7 +157,6 @@ class QWenAttention(nn.Module):
 
 
 class QWenBlock(nn.Module):
-
     def __init__(self, config: QWenConfig):
         super().__init__()
         self.ln_1 = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
@@ -206,7 +203,6 @@ class QWenBlock(nn.Module):
 
 
 class QWenModel(nn.Module):
-
     def __init__(self, config: QWenConfig):
         super().__init__()
         self.config = config
@@ -254,7 +250,6 @@ class QWenModel(nn.Module):
 
 
 class QWenLMHeadModel(nn.Module):
-
     def __init__(self, config: QWenConfig):
         super().__init__()
         self.config = config

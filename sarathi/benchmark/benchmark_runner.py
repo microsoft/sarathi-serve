@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class BenchmarkRunner:
-
     def __init__(
         self,
         replica_id: int,
@@ -145,7 +144,6 @@ class BenchmarkRunner:
 
 
 class BenchmarkRunnerLauncher:
-
     def __init__(self, config: BenchmarkConfig) -> None:
         self.config = config
         self.is_multi_replica = self.config.num_replicas > 1

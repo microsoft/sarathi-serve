@@ -7,7 +7,6 @@ from sarathi.config.utils import get_all_subclasses
 
 @dataclass
 class BasePolyConfig(ABC):
-
     @classmethod
     def create_from_type(cls, type_: Any) -> Any:
         for subclass in get_all_subclasses(cls):

@@ -20,7 +20,6 @@ logger = init_logger(__name__)
 
 
 class ModelRunner:
-
     def __init__(
         self,
         config: SystemConfig,

@@ -15,7 +15,6 @@ from sarathi.utils.threading_utils import synchronized
 
 
 class BaseSequenceManager(ABC):
-
     def __init__(self):
         self.seq_map: Dict[str, Sequence] = {}
 

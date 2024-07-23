@@ -230,7 +230,9 @@ class _AsyncLLMEngine(LLMEngine):
         """
         Simple wrapper around the synchronous `step` method to make it
         """
-        return await asyncio.get_event_loop().run_in_executor(None, self.engine.step, False)
+        return await asyncio.get_event_loop().run_in_executor(
+            None, self.engine.step, False
+        )
 
 
 class AsyncLLMEngine(LLMEngine):
@@ -316,9 +318,10 @@ class AsyncLLMEngine(LLMEngine):
 
         Returns True if there are in-progress requests."""
 
-        new_requests, finished_requests = (
-            self._request_tracker.get_new_and_finished_requests()
-        )
+        (
+            new_requests,
+            finished_requests,
+        ) = self._request_tracker.get_new_and_finished_requests()
 
         for new_request in new_requests:
             # Add the request into the vLLM engine's waiting queue.

@@ -61,7 +61,6 @@ FalconConfig = Union[HF_FalconConfig, RWConfig]
 # between the operations. In order not to degrade the quality of our HF-port,
 # we keep these characteristics in the final model.
 class FalconLinear(nn.Linear):
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         hidden_states = x @ self.weight.T
         if self.bias is None:
@@ -70,7 +69,6 @@ class FalconLinear(nn.Linear):
 
 
 class FalconAttention(nn.Module):
-
     def __init__(self, config: FalconConfig):
         super().__init__()
 
@@ -203,7 +201,6 @@ class FalconAttention(nn.Module):
 
 
 class FalconMLP(nn.Module):
-
     def __init__(self, config: FalconConfig):
         super().__init__()
         hidden_size = config.hidden_size
@@ -247,7 +244,6 @@ class FalconMLP(nn.Module):
 
 
 class FalconDecoderLayer(nn.Module):
-
     def __init__(self, config: FalconConfig):
         super().__init__()
         hidden_size = config.hidden_size
@@ -324,7 +320,6 @@ class FalconDecoderLayer(nn.Module):
 
 
 class FalconModel(nn.Module):
-
     def __init__(self, config: FalconConfig):
         super().__init__()
         self.config = config
@@ -380,7 +375,6 @@ class FalconModel(nn.Module):
 
 
 class FalconForCausalLM(nn.Module):
-
     def __init__(self, config: FalconConfig):
         super().__init__()
         self.config = config

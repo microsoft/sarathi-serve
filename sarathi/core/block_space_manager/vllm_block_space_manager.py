@@ -5,7 +5,6 @@ from sarathi.core.datatypes.sequence import Sequence
 
 
 class VLLMBlockSpaceManager(BaseBlockSpaceManager):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

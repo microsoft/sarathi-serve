@@ -34,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 def if_write_metrics(func):
-
     def wrapper(self, *args, **kwargs):
         if self.config.write_metrics and self.initial_memory_profiling_done:
             return func(self, *args, **kwargs)
@@ -43,7 +42,6 @@ def if_write_metrics(func):
 
 
 def check_enabled(func):
-
     def wrapper(self, *args, **kwargs):
         if self.disabled:
             return
@@ -63,7 +61,6 @@ OPERATION_STR = "Operation"
 
 
 class MetricsStore:
-
     def __init__(
         self,
         replica_config: ReplicaConfig,

@@ -243,13 +243,13 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
 
         with self.get_timer(OperationMetrics.ATTN_DECODE, layer_id):
             if self.contains_decode:
-                output[self.num_prefill_tokens : self.num_total_tokens] = (
-                    self.decode_wrapper.forward(
-                        query[self.num_prefill_tokens : self.num_total_tokens],
-                        kv_cache,
-                        pos_encoding_mode="NONE",
-                        sm_scale=softmax_scale,
-                    )
+                output[
+                    self.num_prefill_tokens : self.num_total_tokens
+                ] = self.decode_wrapper.forward(
+                    query[self.num_prefill_tokens : self.num_total_tokens],
+                    kv_cache,
+                    pos_encoding_mode="NONE",
+                    sm_scale=softmax_scale,
                 )
 
         with self.get_timer(OperationMetrics.ATTN_OUTPUT_RESHAPE, layer_id):

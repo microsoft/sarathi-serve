@@ -9,7 +9,6 @@ from sarathi.core.sequence_manager.base_sequence_manager import BaseSequenceMana
 
 
 class WorkerSequenceManager(BaseSequenceManager):
-
     def __init__(
         self,
         config: SystemConfig,

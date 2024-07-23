@@ -7,7 +7,6 @@ from sarathi.metrics.metrics_store import MetricsStore
 
 
 class CudaTimer:
-
     def __init__(
         self,
         name: OperationMetrics,

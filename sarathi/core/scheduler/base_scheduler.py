@@ -16,7 +16,6 @@ logger = init_logger(__name__)
 
 
 class BaseScheduler(ABC):
-
     def __init__(
         self,
         model_config: ModelConfig,

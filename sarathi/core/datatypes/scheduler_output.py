@@ -4,7 +4,6 @@ from sarathi.core.datatypes.sequence import Sequence, SequenceScheduleMetadata
 
 
 class SchedulerOutputs:
-
     def __init__(
         self,
         id: int,

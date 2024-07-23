@@ -4,7 +4,6 @@ from sarathi.engine.pipeline_parallel_llm_engine import PipelineParallelLLMEngin
 
 
 class LLMEngine:
-
     @classmethod
     def from_system_config(cls, config: SystemConfig) -> "LLMEngine":
         """Creates an LLM engine from the engine arguments."""

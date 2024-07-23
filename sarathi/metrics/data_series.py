@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class DataSeries:
-
     def __init__(
         self,
         x_name: str,

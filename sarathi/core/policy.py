@@ -4,7 +4,6 @@ from sarathi.core.datatypes.sequence import Sequence
 
 
 class Policy:
-
     def get_priority(
         self,
         now: float,
@@ -25,7 +24,6 @@ class Policy:
 
 
 class FCFS(Policy):
-
     def get_priority(
         self,
         now: float,

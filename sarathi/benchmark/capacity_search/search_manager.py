@@ -30,7 +30,6 @@ def run_search(
 
 
 class SearchManager:
-
     def __init__(
         self,
         args: argparse.Namespace,
