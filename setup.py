@@ -124,6 +124,16 @@ activation_extension = CUDAExtension(
 )
 ext_modules.append(activation_extension)
 
+# Fused MOR kernels.
+moe_extension = CUDAExtension(
+    name="sarathi.moe_ops",
+    sources=["csrc/moe.cpp", "csrc/moe_align_block_size_kernels.cu", "csrc/moe_topk_softmax_kernels.cu"],
+    extra_compile_args={
+        "cxx": CXX_FLAGS,
+        "nvcc": NVCC_FLAGS,
+    },
+)
+ext_modules.append(moe_extension)
 
 def get_path(*filepath) -> str:
     return os.path.join(ROOT_DIR, *filepath)

@@ -30,7 +30,7 @@ replica_config = ReplicaConfig(
 )
 
 model_config = ModelConfig(
-    model="meta-llama/Meta-Llama-3-8B-Instruct",
+    model="mistralai/Mixtral-8x7B-Instruct-v0.1",
 )
 
 parallel_config = ParallelConfig(
