@@ -6,7 +6,6 @@ import torch
 import torch.distributed
 import zmq
 
-from sarathi.config import SystemConfig
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs
 from sarathi.logger import init_logger

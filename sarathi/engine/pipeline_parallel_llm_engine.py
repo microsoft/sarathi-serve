@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 import zmq
 
-from sarathi.config import SchedulerType, SystemConfig
+from sarathi.config import SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs, SequenceMetadata
@@ -53,7 +53,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         self.scheduler_output_queue = Queue()
         self.output_queue = Queue()
         self.schedule_event = Event()
-        self.microbatch_watch_queue = Queue()
+        self.microbatch_watch_event = Event()
         self.schedule_thread = Thread(target=self._schedule_loop, daemon=True)
         self.microbatch_watch_thread = Thread(
             target=self._microbatch_watch_loop, daemon=True
@@ -139,7 +139,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
             end_time = time.perf_counter()
 
             if not scheduler_outputs.is_empty():
-                self.microbatch_watch_queue.put(scheduler_outputs)
+                self.microbatch_watch_event.set()
                 self.enqueue_socket.send_pyobj(
                     StepInputs(
                         scheduler_outputs,
@@ -153,8 +153,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
     @exit_on_error
     def _microbatch_watch_loop(self) -> None:
         while True:
-            scheduler_outputs = self.microbatch_watch_queue.get()
-
+            self.microbatch_watch_event.wait()
             self.microbatch_socket.recv_pyobj()
             self.schedule_event.set()
 

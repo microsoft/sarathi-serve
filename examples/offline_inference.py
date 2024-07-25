@@ -35,7 +35,7 @@ model_config = ModelConfig(
 
 parallel_config = ParallelConfig(
     tensor_parallel_size=1,
-    pipeline_parallel_size=1,
+    pipeline_parallel_size=4,
 )
 
 scheduler_config = SarathiSchedulerConfig(
