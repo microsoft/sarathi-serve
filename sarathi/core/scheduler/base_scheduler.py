@@ -1,8 +1,7 @@
-import time
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import List
 
-from sarathi.config import BaseSchedulerConfig, CacheConfig, ModelConfig
+from sarathi.config import BaseSchedulerConfig, CacheConfig, ModelConfig, ParallelConfig
 from sarathi.core.block_space_manager.block_space_manager_registry import (
     BlockSpaceManagerRegistry,
 )
@@ -22,11 +21,13 @@ class BaseScheduler(ABC):
         model_config: ModelConfig,
         scheduler_config: BaseSchedulerConfig,
         cache_config: CacheConfig,
+        parallel_config: ParallelConfig,
     ) -> None:
         self.metrics_store = MetricsStore.get_instance()
         self.model_config = model_config
         self.scheduler_config = scheduler_config
         self.cache_config = cache_config
+        self.parallel_config = parallel_config
 
         # we maintain this just for logging purposes
         self._iteration_id = -1
@@ -74,7 +75,7 @@ class BaseScheduler(ABC):
         # such as self.running and self.waiting.
         self._iteration_id += 1
 
-        if self.num_running_batches >= self.scheduler_config.num_pipeline_stages:
+        if self.num_running_batches >= self.parallel_config.pipeline_parallel_size:
             return SchedulerOutputs(
                 self._iteration_id,
                 ignored_seq_ids=[],
@@ -89,17 +90,14 @@ class BaseScheduler(ABC):
 
         return scheduler_outputs
 
-    def remove_finished_seqs(self) -> None:
-        self.running = [seq for seq in self.running if not seq.is_finished()]
-
     def free_finished_seqs(self) -> None:
         for seq in self.running:
             if seq.is_finished():
                 self._free_seq(seq)
+        self.running = [seq for seq in self.running if not seq.is_finished()]
 
     def on_step_completed(self) -> None:
         self.free_finished_seqs()
-        self.remove_finished_seqs()
         self.num_running_batches -= 1
 
     def _allocate(self, seq: Sequence) -> None:

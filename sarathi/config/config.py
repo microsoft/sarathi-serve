@@ -182,9 +182,6 @@ class BaseSchedulerConfig(BasePolyConfig):
             "help": "Maximum number of sequences to be processed in a single iteration (batch size)."
         },
     )
-    num_pipeline_stages: int = field(
-        default=1, metadata={"help": "Number of pipeline stages."}
-    )
 
     @abstractmethod
     def get_max_num_batched_tokens(self, max_model_len: int):

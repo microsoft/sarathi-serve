@@ -14,7 +14,7 @@ class WorkerSequenceManager(BaseSequenceManager):
         self,
         config: SystemConfig,
     ):
-        super().__init__()
+        super().__init__(config)
         # we will have a clone of block manager here, it is supposed
         # to work in sync block manager in scheduler the idea is to avoid
         # sending block table every time to the worker

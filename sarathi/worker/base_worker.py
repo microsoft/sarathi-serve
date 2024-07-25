@@ -2,14 +2,17 @@
 
 import os
 import time
+from threading import Event, Thread
 from typing import Optional, Tuple
 
 import torch
 import torch.distributed
+import zmq
 
 from sarathi.config import CacheConfig, ParallelConfig, SystemConfig
+from sarathi.core.datatypes.comm_info import CommInfo
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
-from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence
+from sarathi.core.datatypes.sequence import SamplerOutputs
 from sarathi.core.sequence_manager.worker_sequence_manager import WorkerSequenceManager
 from sarathi.logger import init_logger
 from sarathi.metrics.metrics_store import MetricsStore
@@ -21,10 +24,13 @@ from sarathi.model_executor.parallel_utils.parallel_state import (
     get_tensor_model_parallel_rank,
     initialize_model_parallel,
 )
-from sarathi.utils.threading_utils import synchronized
+from sarathi.utils.threading_utils import exit_on_error, synchronized
 from sarathi.worker.cache_engine import CacheEngine
 
 logger = init_logger(__name__)
+
+
+_READY_ACK_WAIT_TIME = 1
 
 
 class BaseWorker:
@@ -39,15 +45,15 @@ class BaseWorker:
         self,
         config: SystemConfig,
         local_rank: int,
-        rank: Optional[int] = None,
-        distributed_init_method: Optional[str] = None,
+        rank: int,
+        comm_info: CommInfo,
     ) -> None:
         # Not: the cache config is partially initialized at this point, ie. it doesn't have
         # information about the number of blocks, it will get updated after profiling
         self.config = config
         self.local_rank = local_rank
         self.rank = rank
-        self.distributed_init_method = distributed_init_method
+        self.comm_info = comm_info
 
         # Uninitialized cache engine. Will be initialized by
         # self.init_cache_engine().
@@ -63,6 +69,23 @@ class BaseWorker:
             config.replica_config,
             config.model_config,
             config.metrics_config,
+        )
+
+        self._init_zmq_sockets()
+
+        self.worker_ready_event = Event()
+        self.execution_thread = Thread(target=self._execution_loop, daemon=True)
+
+    def _init_zmq_sockets(self):
+        self.zmq_context = zmq.Context()
+        self.enqueue_socket = self.zmq_context.socket(zmq.SUB)
+        self.enqueue_socket.connect(
+            f"tcp://{self.comm_info.engine_ip_address}:{self.comm_info.enqueue_socket_port}"
+        )
+        self.enqueue_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        self.output_socket = self.zmq_context.socket(zmq.PUSH)
+        self.output_socket.connect(
+            f"tcp://{self.comm_info.engine_ip_address}:{self.comm_info.output_socket_port}"
         )
 
     def _verify_parallel_config(self) -> None:
@@ -89,7 +112,9 @@ class BaseWorker:
 
         # Initialize the distributed environment.
         _init_distributed_environment(
-            self.config.parallel_config, self.rank, self.distributed_init_method
+            self.config.parallel_config,
+            self.rank,
+            self.comm_info.distributed_init_method,
         )
 
         self.tensor_model_parallel_rank = get_tensor_model_parallel_rank()
@@ -133,9 +158,11 @@ class BaseWorker:
             self.config,
         )
 
-    @synchronized
-    def add_seq(self, seq: Sequence) -> None:
-        self.seq_manager.add_seq(seq)
+        self.execution_thread.start()
+
+    def wait_till_ready(self) -> None:
+        self.worker_ready_event.wait()
+        time.sleep(_READY_ACK_WAIT_TIME)
 
     @synchronized
     def get_model_parallel_ranks(self) -> Tuple[int, int]:
@@ -151,6 +178,7 @@ class BaseWorker:
         self,
         scheduler_outputs: SchedulerOutputs,
     ) -> Optional[SamplerOutputs]:
+        torch.cuda.synchronize()
         batch_stage_start_time = time.monotonic()
 
         _, seq_metadata_list = self.seq_manager.on_schedule(scheduler_outputs)
@@ -161,6 +189,8 @@ class BaseWorker:
         )
 
         self.on_step_completed(scheduler_outputs, sampler_outputs)
+
+        torch.cuda.synchronize()
 
         batch_stage_end_time = time.monotonic()
 
@@ -174,6 +204,25 @@ class BaseWorker:
         )
 
         return sampler_outputs
+
+    @exit_on_error
+    def _execution_loop(self) -> None:
+        torch.cuda.set_device(self.device)
+
+        self.worker_ready_event.set()
+
+        while True:
+            step_inputs = self.enqueue_socket.recv_pyobj()
+
+            for new_seq in step_inputs.new_seqs:
+                self.seq_manager.add_seq(new_seq)
+
+            output = self.execute_model(step_inputs.scheduler_outputs)
+
+            if not self.is_tensor_parallel_rank_zero:
+                continue
+
+            self.output_socket.send_pyobj(output)
 
     @synchronized
     def get_metrics_store(self) -> MetricsStore:
@@ -218,7 +267,7 @@ class BaseWorker:
 def _init_distributed_environment(
     parallel_config: ParallelConfig,
     rank: int,
-    distributed_init_method: Optional[str] = None,
+    distributed_init_method: str,
 ) -> None:
     """Initialize the distributed environment."""
     if torch.distributed.is_initialized():
@@ -229,11 +278,6 @@ def _init_distributed_environment(
                 "size does not match parallel_config.world_size "
                 f"({torch_world_size} vs. {parallel_config.world_size})."
             )
-    elif not distributed_init_method:
-        raise ValueError(
-            "distributed_init_method must be set if torch.distributed "
-            "is not already initialized"
-        )
     else:
         torch.distributed.init_process_group(
             backend="nccl",

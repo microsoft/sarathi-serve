@@ -4,10 +4,13 @@ from queue import Empty, Queue
 from threading import Event, Thread
 from typing import List, Tuple
 
-from sarathi.config import SystemConfig
+import zmq
+
+from sarathi.config import SchedulerType, SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs, SequenceMetadata
+from sarathi.core.datatypes.step_inputs import StepInputs
 from sarathi.engine.base_llm_engine import BaseLLMEngine
 from sarathi.logger import init_logger
 from sarathi.utils.threading_utils import exit_on_error, synchronized
@@ -44,12 +47,13 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         config: SystemConfig,
     ) -> None:
         super().__init__(config)
+
         # Create the request queue.
         self.has_started_execution_loops = False
         self.scheduler_output_queue = Queue()
         self.output_queue = Queue()
         self.schedule_event = Event()
-        self.microbatch_watch_event = Event()
+        self.microbatch_watch_queue = Queue()
         self.schedule_thread = Thread(target=self._schedule_loop, daemon=True)
         self.microbatch_watch_thread = Thread(
             target=self._microbatch_watch_loop, daemon=True
@@ -60,6 +64,12 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         )
 
         self.pending_step_outputs: List[Tuple[SchedulerOutputs, SamplerOutputs]] = []
+
+    def _init_zmq_sockets(self):
+        super()._init_zmq_sockets()
+        # PULL socket for microbatch completion signal
+        self.microbatch_socket = self.zmq_context.socket(zmq.PULL)
+        self.microbatch_socket.bind(f"tcp://*:{self.comm_info.microbatch_socket_port}")
 
     def _validate_parallel_config(self) -> None:
         assert self.config.parallel_config.pipeline_parallel_size > 1
@@ -129,12 +139,13 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
             end_time = time.perf_counter()
 
             if not scheduler_outputs.is_empty():
-                self.microbatch_watch_event.set()
-                self._run_workers(
-                    "enqueue",
-                    scheduler_outputs=scheduler_outputs,
-                    pending_step_outputs=self._get_pending_step_outputs(),
-                    ignore_output=True,
+                self.microbatch_watch_queue.put(scheduler_outputs)
+                self.enqueue_socket.send_pyobj(
+                    StepInputs(
+                        scheduler_outputs,
+                        new_seqs=self._get_new_seqs(),
+                        pending_step_outputs=self._get_pending_step_outputs(),
+                    )
                 )
 
             self.metrics_store.on_schedule(seq_metadata_list, start_time, end_time)
@@ -142,13 +153,9 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
     @exit_on_error
     def _microbatch_watch_loop(self) -> None:
         while True:
-            self.microbatch_watch_event.wait()
-            self.microbatch_watch_event.clear()
+            scheduler_outputs = self.microbatch_watch_queue.get()
 
-            self._run_worker(
-                (0, 0),  # rank zero
-                "get_output",
-            )
+            self.microbatch_socket.recv_pyobj()
             self.schedule_event.set()
 
     @exit_on_error
@@ -156,13 +163,7 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         while True:
             scheduler_stage_output = self.scheduler_output_queue.get()
 
-            sampler_outputs = self._run_worker(
-                (
-                    0,
-                    self.config.parallel_config.pipeline_parallel_size - 1,
-                ),  # TP rank zero for last pipeline stage
-                "get_output",
-            )
+            sampler_outputs = self.output_socket.recv_pyobj()
 
             self._append_pending_step_output(
                 scheduler_stage_output.scheduler_outputs, sampler_outputs

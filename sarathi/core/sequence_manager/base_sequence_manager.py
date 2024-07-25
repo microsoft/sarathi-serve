@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
+from sarathi.config import SystemConfig
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import (
@@ -16,7 +17,7 @@ from sarathi.utils.threading_utils import synchronized
 
 class BaseSequenceManager(ABC):
 
-    def __init__(self):
+    def __init__(self, config: SystemConfig):
         self.seq_map: Dict[str, Sequence] = {}
 
     @synchronized
@@ -89,19 +90,15 @@ class BaseSequenceManager(ABC):
         pass
 
     def _process_seq_output(
-        self, seq_id: str, sample: SamplerOutput, prompt_chunk_len: int
+        self,
+        seq: Sequence,
+        sample: SamplerOutput,
     ) -> None:
-        assert seq_id in self.seq_map
-        seq = self.seq_map[seq_id]
         # at this point, the seq should be in paused state
         assert not seq.is_finished()
 
         if not seq.prompt_processing_finished:
-            seq.update_prompt_tokens_processed(prompt_chunk_len)
-            # check the updated sequence status. if the sequence processing completes
-            # in this iteration we would want to append the token, else we can continue
-            if not seq.prompt_processing_finished:
-                return
+            return
 
         seq.append_token_id(sample.output_token)
         self._on_append_token(seq)
@@ -129,11 +126,20 @@ class BaseSequenceManager(ABC):
                 # this request might still be executing when the next stage scheduling
                 # triggers the preemption
                 continue
+
+            if not seq.prompt_processing_finished:
+                seq.update_prompt_tokens_stage_processed(
+                    scheduled_seq_metadata.prompt_chunk_len
+                )
+                seq.update_prompt_tokens_processed(
+                    scheduled_seq_metadata.prompt_chunk_len
+                )
+
             self._pause_seq(scheduled_seq_metadata.seq_id)
+
             self._process_seq_output(
-                scheduled_seq_metadata.seq_id,
+                seq,
                 sampler_output,
-                scheduled_seq_metadata.prompt_chunk_len,
             )
 
     def generate_request_outputs(
