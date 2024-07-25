@@ -30,6 +30,8 @@ class OperationMetrics(enum.Enum):
     ADD = "add"
     NCCL_SEND = "nccl_send"
     NCCL_RECV = "nccl_recv"
+    MOE_GATING = "moe_gating"
+    MOE_LINEAR = "moe_linear"
 
 
 class CpuOperationMetrics(enum.Enum):

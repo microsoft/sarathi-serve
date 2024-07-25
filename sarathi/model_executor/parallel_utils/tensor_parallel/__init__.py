@@ -1,5 +1,6 @@
 from .layers import (
     ColumnParallelLinear,
+    ReplicatedLinear,
     RowParallelLinear,
     VocabParallelEmbedding,
     copy_tensor_model_parallel_attributes,
@@ -23,6 +24,7 @@ __all__ = [
     "ColumnParallelLinear",
     "RowParallelLinear",
     "VocabParallelEmbedding",
+    "ReplicatedLinear",
     "set_tensor_model_parallel_attributes",
     "set_defaults_if_not_set_tensor_model_parallel_attributes",
     "copy_tensor_model_parallel_attributes",

@@ -79,7 +79,6 @@ class VocabParallelEmbedding(torch.nn.Module):
         embedding_dim: size of hidden state.
 
     Keyword Arguments:
-        init_method: method to initialize weights.
         params_dtype
         use_cpu_initialization
         perform_initialization
@@ -90,8 +89,7 @@ class VocabParallelEmbedding(torch.nn.Module):
         num_embeddings: int,
         embedding_dim: int,
         *,
-        init_method=init.xavier_normal_,
-        params_dtype: torch.dtype = None,
+        params_dtype: Optional[torch.dtype] = None,
         use_cpu_initialization: bool = False,
         perform_initialization: bool = False,
         linear_metric_name: Optional[str] = None,
@@ -214,9 +212,7 @@ class ColumnParallelLinear(torch.nn.Module):
         *,
         bias=True,
         gather_output=True,
-        init_method=init.xavier_normal_,
         stride=1,
-        keep_master_weight_for_test=False,
         skip_bias_add=False,
         params_dtype=None,
         use_cpu_initialization=False,
@@ -355,9 +351,6 @@ class RowParallelLinear(torch.nn.Module):
         *,
         bias=True,
         input_is_parallel=False,
-        init_method=init.xavier_normal_,
-        stride=1,
-        keep_master_weight_for_test=False,
         skip_bias_add=False,
         params_dtype=None,
         use_cpu_initialization=False,
@@ -458,4 +451,80 @@ class RowParallelLinear(torch.nn.Module):
         else:
             output = output_
             output_bias = self.bias
+        return output, output_bias
+
+
+class ReplicatedLinear(torch.nn.Module):
+    """Replicated linear layer.
+
+    Args:
+        input_size: input dimension of the linear layer.
+        output_size: output dimension of the linear layer.
+        bias: If true, add bias.
+        skip_bias_add: If true, skip adding bias but instead return it.
+        params_dtype: Data type for the parameters.
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        output_size: int,
+        bias: bool = True,
+        skip_bias_add: bool = False,
+        params_dtype: Optional[torch.dtype] = None,
+        metric_name: Optional[str] = None,
+        layer_id: Optional[int] = None,
+    ):
+        super(ReplicatedLinear, self).__init__()
+
+        # Keep input parameters
+        self.input_size = input_size
+        self.output_size = output_size
+        self.skip_bias_add = skip_bias_add
+        if params_dtype is None:
+            params_dtype = torch.get_default_dtype()
+
+        self.create_weights(params_dtype)
+
+        if bias:
+            self.bias = Parameter(
+                torch.empty(
+                    self.output_size,
+                    device=torch.cuda.current_device(),
+                    dtype=self.params_dtype,
+                )
+            )
+
+            # Always initialize bias to zero
+            with torch.no_grad():
+                self.bias.zero_()
+        else:
+            self.register_parameter("bias", None)
+
+        self._timer = CudaTimer(metric_name, layer_id=layer_id)
+
+    def create_weights(self, dtype: torch.dtype) -> None:
+        self.weight = Parameter(
+            torch.empty(
+                self.output_size,
+                self.input_size,
+                device=torch.cuda.current_device(),
+                dtype=dtype,
+            )
+        )
+
+    def apply_weights(self, x: torch.Tensor) -> torch.Tensor:
+        with self._timer:
+            return F.linear(x, self.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Matrix multiply
+        output = self.apply_weights(x)
+
+        if not self.skip_bias_add:
+            output = output + self.bias if self.bias is not None else output
+            output_bias = None
+        else:
+            output_bias = self.bias
+
         return output, output_bias
