@@ -39,7 +39,9 @@ class Sequence:
 
         self.output_token_ids: List[int] = []
         self.prompt_tokens_processed = 0
+        self.prompt_tokens_stage_processed = 0
         self.prompt_processing_finished = False
+        self.prompt_stage_processing_finished = False
 
         self.output_text = ""
 
@@ -94,6 +96,15 @@ class Sequence:
             self.prompt_processing_finished = True
             self.state.on_prompt_processing_completed()
 
+    def update_prompt_tokens_stage_processed(self, num_tokens: int) -> None:
+        assert not self.prompt_processing_finished
+        assert not self.prompt_stage_processing_finished
+        assert num_tokens > 0
+        self.prompt_tokens_stage_processed += num_tokens
+        assert self.prompt_tokens_stage_processed <= len(self.prompt_token_ids)
+        if self.prompt_tokens_stage_processed == len(self.prompt_token_ids):
+            self.prompt_stage_processing_finished = True
+
     def append_token_id(
         self,
         token_id: int,
@@ -121,6 +132,9 @@ class Sequence:
     def get_num_prompt_tokens_processed(self) -> int:
         return self.prompt_tokens_processed
 
+    def get_num_prompt_tokens_stage_processed(self) -> int:
+        return self.prompt_tokens_stage_processed
+
     def get_last_token_id(self) -> int:
         if not self.output_token_ids:
             return self.prompt_token_ids[-1]
@@ -130,14 +144,17 @@ class Sequence:
         return self.output_token_ids
 
     def get_next_prompt_chunk_token_ids(self, chunk_size: int) -> List[int]:
-        start = self.prompt_tokens_processed
+        start = self.prompt_tokens_stage_processed
         end = start + chunk_size
-        assert end <= len(self.prompt_token_ids)
+        assert end <= len(self.prompt_token_ids), (
+            f"End index {end} is greater than the prompt length "
+            f"{len(self.prompt_token_ids)}"
+        )
         return self.prompt_token_ids[start:end]
 
     def get_next_prompt_chunk_len(self, chunk_size: int) -> int:
         return min(
-            chunk_size, len(self.prompt_token_ids) - self.prompt_tokens_processed
+            chunk_size, len(self.prompt_token_ids) - self.prompt_tokens_stage_processed
         )
 
     def is_finished(self) -> bool:
@@ -158,7 +175,9 @@ class Sequence:
     def reset_for_recompute(self):
         self.set_status(SequenceStatus.WAITING)
         self.prompt_tokens_processed = 0
+        self.prompt_tokens_stage_processed = 0
         self.prompt_processing_finished = False
+        self.prompt_stage_processing_finished = False
         self.prompt_token_ids = self.prompt_token_ids + self.output_token_ids
         self.output_token_ids = []
 
@@ -188,7 +207,13 @@ class Sequence:
         return (
             f"Sequence(seq_id={self.seq_id}, "
             f"status={self.get_status().name}, "
-            f"num_blocks={len(self.logical_token_blocks)})"
+            f"num_blocks={len(self.logical_token_blocks)}, "
+            f"num_prompt_tokens={len(self.prompt_token_ids)}, "
+            f"num_output_tokens={len(self.output_token_ids)}, "
+            f"prompt_processing_finished={self.prompt_processing_finished}, "
+            f"num_prompt_tokens_processed={self.prompt_tokens_processed}, "
+            f"num_prompt_tokens_stage_processed={self.prompt_tokens_stage_processed}, "
+            f"prompt_stage_processing_finished={self.prompt_stage_processing_finished})"
         )
 
 
@@ -232,10 +257,10 @@ class SequenceScheduleMetadata:
     def from_sequence(
         cls,
         seq: Sequence,
-        prompt_chunk_len: int = None,
+        prompt_chunk_len: Optional[int] = None,
     ) -> "SequenceScheduleMetadata":
         if prompt_chunk_len is None:
-            if seq.prompt_processing_finished:
+            if seq.prompt_stage_processing_finished:
                 prompt_chunk_len = 0
             else:
                 prompt_chunk_len = seq.get_prompt_len()

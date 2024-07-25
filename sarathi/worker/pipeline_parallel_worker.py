@@ -1,13 +1,11 @@
 """A GPU worker class."""
 
-from queue import Queue
-from threading import Thread
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 import torch
 import torch.distributed
+import zmq
 
-from sarathi.config import CacheConfig, SystemConfig
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs
 from sarathi.logger import init_logger
@@ -25,45 +23,22 @@ class PipelineParallelWorker(BaseWorker):
     distributed inference, each worker is assigned a partition of the model.
     """
 
-    def __init__(
-        self,
-        config: SystemConfig,
-        local_rank: int,
-        rank: Optional[int] = None,
-        distributed_init_method: Optional[str] = None,
-    ) -> None:
-        super().__init__(
-            config,
-            local_rank,
-            rank,
-            distributed_init_method,
+    def _init_zmq_sockets(self):
+        super()._init_zmq_sockets()
+
+        self.microbatch_socket = self.zmq_context.socket(zmq.PUSH)
+        self.microbatch_socket.connect(
+            f"tcp://{self.comm_info.engine_ip_address}:{self.comm_info.microbatch_socket_port}"
         )
-        self.execution_queue = Queue()
-        self.output_queue = Queue()
-        self.execution_thread = Thread(target=self._execution_loop, daemon=True)
 
     def _verify_parallel_config(self) -> None:
         assert self.config.parallel_config.pipeline_parallel_size > 1
-
-    def init_cache_engine(self, cache_config: CacheConfig) -> None:
-        super().init_cache_engine(cache_config)
-        self.execution_thread.start()
-
-    def enqueue(
-        self,
-        scheduler_outputs: SchedulerOutputs,
-        pending_step_outputs: List[Tuple[SchedulerOutputs, SamplerOutputs]] = [],
-    ) -> None:
-        for pending_step_output in pending_step_outputs:
-            self.on_sampling_completed(pending_step_output[0], pending_step_output[1])
-
-        self.execution_queue.put(scheduler_outputs)
 
     def on_step_completed(
         self, scheduler_outputs: SchedulerOutputs, sampler_outputs: SamplerOutputs
     ) -> None:
         # in pipeline parallel case, each stage won't have sampler output
-        # so we need to do the book keeping update later
+        # so we don't do anything here
         pass
 
     @synchronized
@@ -76,20 +51,28 @@ class PipelineParallelWorker(BaseWorker):
     def _execution_loop(self) -> None:
         torch.cuda.set_device(self.device)
 
+        self.worker_ready_event.set()
+
         while True:
-            scheduler_outputs = self.execution_queue.get()
-            output = self.execute_model(scheduler_outputs)
+            step_inputs = self.enqueue_socket.recv_pyobj()
+
+            for new_seq in step_inputs.new_seqs:
+                self.seq_manager.add_seq(new_seq)
+
+            for pending_step_output in step_inputs.pending_step_outputs:
+                self.seq_manager.on_step_completed(
+                    pending_step_output[0], pending_step_output[1]
+                )
+
+            output = self.execute_model(step_inputs.scheduler_outputs)
 
             if not self.is_tensor_parallel_rank_zero:
                 continue
 
             if self.is_last_pipeline_stage:
-                self.output_queue.put(output)
+                self.output_socket.send_pyobj(output)
             elif self.is_first_pipeline_stage:
-                self.output_queue.put(None)
-
-    def get_output(self) -> Optional[SamplerOutputs]:
-        return self.output_queue.get()
+                self.microbatch_socket.send_pyobj(None)
 
     @synchronized
     def get_model_parallel_ranks(self) -> Tuple[int, int]:

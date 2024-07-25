@@ -74,7 +74,9 @@ class ModelRunner:
             )
             current_prompt_chunk_len = len(current_prompt_chunk_tokens)
             current_prompt_chunk_lens.append(current_prompt_chunk_len)
-            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed()
+            processed_prompt_len = (
+                seq_metadata.seq.get_num_prompt_tokens_stage_processed()
+            )
 
             current_total_len = processed_prompt_len + current_prompt_chunk_len
 

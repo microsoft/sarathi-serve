@@ -109,7 +109,9 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.contains_prefill = True
 
             prompt_chunk_len = seq_metadata.prompt_chunk_len
-            processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed()
+            processed_prompt_len = (
+                seq_metadata.seq.get_num_prompt_tokens_stage_processed()
+            )
             current_total_len = processed_prompt_len + prompt_chunk_len
 
             # indptr for the prompt tokens in q/o tensor

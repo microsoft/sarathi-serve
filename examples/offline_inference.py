@@ -44,7 +44,7 @@ scheduler_config = SarathiSchedulerConfig(
 )
 
 metrics_config = MetricsConfig(
-    write_metrics=False,
+    write_metrics=True,
     enable_chrome_trace=True,
 )
 
@@ -99,3 +99,6 @@ for output in outputs:
     print("-----------------------------------------------------------")
     print(f"Generated text: {generated_text!r}")
     print("===========================================================")
+
+llm_engine.pull_worker_metrics()
+llm_engine.plot_metrics()

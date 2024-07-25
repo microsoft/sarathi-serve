@@ -4,11 +4,15 @@ import time
 from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
+import zmq
+
 from sarathi.config import ModelConfig, SystemConfig
+from sarathi.core.datatypes.comm_info import CommInfo
 from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.sampling_params import SamplingParams
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence, SequenceMetadata
+from sarathi.core.datatypes.step_inputs import StepInputs
 from sarathi.core.scheduler.scheduler_registry import SchedulerRegistry
 from sarathi.core.sequence_manager.engine_sequence_manager import EngineSequenceManager
 from sarathi.engine.ray_utils import RayWorker, initialize_cluster, ray
@@ -17,11 +21,12 @@ from sarathi.metrics.constants import CpuOperationMetrics
 from sarathi.metrics.cpu_timer import CpuTimer
 from sarathi.metrics.metrics_store import MetricsStore
 from sarathi.transformers_utils.tokenizer import get_tokenizer
-from sarathi.utils import Counter, get_ip, get_random_port, unset_cuda_visible_devices
+from sarathi.utils import Counter, get_ip, unset_cuda_visible_devices
+from sarathi.utils.threading_utils import synchronized
 
 logger = init_logger(__name__)
 
-_MAX_WORKER_CONCURRENCY = 3
+_MAX_WORKER_CONCURRENCY = 1
 
 ModelParallelRank = Tuple[int, int]
 
@@ -63,7 +68,7 @@ class BaseLLMEngine:
             revision=config.model_config.revision,
         )
 
-        self.seq_manager = EngineSequenceManager(self.tokenizer)
+        self.seq_manager = EngineSequenceManager(self.tokenizer, config)
         self.seq_counter = Counter()
 
         self.metrics_store = MetricsStore.get_or_create_instance(
@@ -80,6 +85,9 @@ class BaseLLMEngine:
         # Create the parallel GPU workers.
         self._init_workers_ray()
 
+        # Setup ZMQ communication channels
+        self._init_zmq_sockets()
+
         # Profile the memory usage and initialize the cache.
         self._init_cache()
 
@@ -94,12 +102,24 @@ class BaseLLMEngine:
             config.model_config,
             config.scheduler_config,
             config.cache_config,
+            config.parallel_config,
         )
 
         self._scheduler_timer = CpuTimer(CpuOperationMetrics.SCHEDULE)
         self._process_model_outputs_timer = CpuTimer(
             CpuOperationMetrics.PROCESS_MODEL_OUTPUTS
         )
+
+        self.new_seqs: List[Sequence] = []
+
+        self._run_workers("wait_till_ready")
+
+    def _init_zmq_sockets(self):
+        self.zmq_context = zmq.Context()
+        self.enqueue_socket = self.zmq_context.socket(zmq.PUB)
+        self.enqueue_socket.bind(f"tcp://*:{self.comm_info.enqueue_socket_port}")
+        self.output_socket = self.zmq_context.socket(zmq.PULL)
+        self.output_socket.bind(f"tcp://*:{self.comm_info.output_socket_port}")
 
     def _validate_parallel_config(self) -> None:
         assert self.config.parallel_config.pipeline_parallel_size == 1
@@ -154,13 +174,7 @@ class BaseLLMEngine:
 
             self.workers.append(worker)
 
-        # TODO(amey): Use a more robust method to initialize the workers.
-        # In case port is already in use, this will fail.
-        distributed_init_method = f"tcp://{driver_ip}:{get_random_port()}"
-
-        logger.info(
-            f"Initializing workers with distributed init method: {distributed_init_method}"
-        )
+        self.comm_info = CommInfo(driver_ip)
 
         # Initialize torch distributed process group for the workers.
         config = copy.deepcopy(self.config)
@@ -175,7 +189,7 @@ class BaseLLMEngine:
                     config,
                     local_rank,
                     rank,
-                    distributed_init_method,
+                    self.comm_info,
                 )
             )
             ray.get(promise)
@@ -320,12 +334,24 @@ class BaseLLMEngine:
         )
         # Add the sequence to the scheduler.
         self.seq_manager.add_seq(seq)
-        self._run_workers(
-            "add_seq",
-            seq=seq,
-        )
+        # we create a copy of the seq so that the workers
+        # receive an unmodified version of the seq
+        # which is unaffected by the engine's actions
+        self._append_new_seq(copy.deepcopy(seq))
         self.scheduler.add_seq(seq)
         self.metrics_store.on_request_arrival(seq)
+
+    @synchronized
+    def _append_new_seq(self, seq: Sequence) -> None:
+        self.new_seqs.append(seq)
+
+    @synchronized
+    def _get_new_seqs(
+        self,
+    ) -> List[Sequence]:
+        new_seqs = self.new_seqs
+        self.new_seqs = []
+        return new_seqs
 
     def get_num_unfinished_requests(self) -> int:
         """Gets the number of unfinished requests."""
@@ -355,10 +381,13 @@ class BaseLLMEngine:
             scheduler_outputs
         )
 
-        sampler_outputs = self._run_workers(
-            "execute_model",
-            scheduler_outputs=scheduler_outputs,
+        self.enqueue_socket.send_pyobj(
+            StepInputs(
+                scheduler_outputs,
+                new_seqs=self._get_new_seqs(),
+            )
         )
+        sampler_outputs = self.output_socket.recv_pyobj()
 
         return self._on_step_completed(
             scheduler_outputs,
@@ -387,7 +416,13 @@ class BaseLLMEngine:
         if ignore_output:
             return
 
-        all_outputs = ray.get(all_outputs)
+        while True:
+            try:
+                all_outputs = ray.get(all_outputs, timeout=0)
+                break
+            except ray.exceptions.GetTimeoutError:
+                time.sleep(0)
+                continue
 
         if get_all_outputs:
             return all_outputs
@@ -416,7 +451,7 @@ class BaseLLMEngine:
                 output = ray.get(output, timeout=0)
                 break
             except ray.exceptions.GetTimeoutError:
-                time.sleep(0.005)
+                time.sleep(0)
                 continue
 
         return output

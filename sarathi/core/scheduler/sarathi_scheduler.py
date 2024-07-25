@@ -3,7 +3,12 @@ from typing import List
 
 import numpy as np
 
-from sarathi.config import CacheConfig, ModelConfig, SarathiSchedulerConfig
+from sarathi.config import (
+    CacheConfig,
+    ModelConfig,
+    ParallelConfig,
+    SarathiSchedulerConfig,
+)
 from sarathi.core.block_space_manager.sarathi_block_space_manager import (
     SarathiBlockSpaceManager,
 )
@@ -22,8 +27,9 @@ class SarathiScheduler(BaseScheduler):
         model_config: ModelConfig,
         scheduler_config: SarathiSchedulerConfig,
         cache_config: CacheConfig,
+        parallel_config: ParallelConfig,
     ) -> None:
-        super().__init__(model_config, scheduler_config, cache_config)
+        super().__init__(model_config, scheduler_config, cache_config, parallel_config)
 
         self.chunk_size = self.scheduler_config.chunk_size
         self.enable_dynamic_chunking_schedule = (
@@ -72,7 +78,10 @@ class SarathiScheduler(BaseScheduler):
 
         if self.enable_dynamic_chunking_schedule:
             request_stage_idx = int(
-                np.ceil(seq.get_num_prompt_tokens_processed() // self._tokens_per_stage)
+                np.ceil(
+                    seq.get_num_prompt_tokens_stage_processed()
+                    // self._tokens_per_stage
+                )
             )
             assert request_stage_idx < len(self._chunk_sizes)
             chunk_size = self._chunk_sizes[request_stage_idx]
@@ -80,7 +89,7 @@ class SarathiScheduler(BaseScheduler):
             chunk_size = self.chunk_size
 
         next_num_tokens = min(
-            seq.get_prompt_len() - seq.get_num_prompt_tokens_processed(),
+            seq.get_prompt_len() - seq.get_num_prompt_tokens_stage_processed(),
             chunk_size - num_batched_tokens,
         )
 
@@ -125,7 +134,7 @@ class SarathiScheduler(BaseScheduler):
                 running.append(seq)
                 continue
 
-            if not seq.prompt_processing_finished:
+            if not seq.prompt_stage_processing_finished:
                 running_prefills.append(seq)
                 continue
 
@@ -154,7 +163,7 @@ class SarathiScheduler(BaseScheduler):
         # the memory for all these prefills has already been allocated
         # so we should be able to run all of them
         for seq in running_prefills:
-            assert not seq.prompt_processing_finished
+            assert not seq.prompt_stage_processing_finished
 
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
                 seq, num_batched_tokens

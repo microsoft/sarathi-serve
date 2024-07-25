@@ -2,7 +2,12 @@ import time
 from enum import Enum, auto
 from typing import List
 
-from sarathi.config import CacheConfig, ModelConfig, SimpleChunkingSchedulerConfig
+from sarathi.config import (
+    CacheConfig,
+    ModelConfig,
+    ParallelConfig,
+    SimpleChunkingSchedulerConfig,
+)
 from sarathi.core.block_space_manager.vllm_block_space_manager import (
     VLLMBlockSpaceManager,
 )
@@ -27,8 +32,9 @@ class SimpleChunkingScheduler(BaseScheduler):
         model_config: ModelConfig,
         scheduler_config: SimpleChunkingSchedulerConfig,
         cache_config: CacheConfig,
+        parallel_config: ParallelConfig,
     ) -> None:
-        super().__init__(model_config, scheduler_config, cache_config)
+        super().__init__(model_config, scheduler_config, cache_config, parallel_config)
 
         self.chunk_size = self.scheduler_config.chunk_size
         self.whose_turn = Turn.PREFILL
@@ -42,7 +48,7 @@ class SimpleChunkingScheduler(BaseScheduler):
         assert not seq.is_finished()
 
         next_num_tokens = min(
-            seq.get_prompt_len() - seq.get_num_prompt_tokens_processed(),
+            seq.get_prompt_len() - seq.get_num_prompt_tokens_stage_processed(),
             self.chunk_size - num_batched_tokens,
         )
 
@@ -74,7 +80,7 @@ class SimpleChunkingScheduler(BaseScheduler):
                 running.append(seq)
                 continue
 
-            if seq.prompt_processing_finished:
+            if seq.prompt_stage_processing_finished:
                 running.append(seq)
                 continue
 
@@ -164,7 +170,7 @@ class SimpleChunkingScheduler(BaseScheduler):
                 running.append(seq)
                 continue
 
-            if not seq.prompt_processing_finished:
+            if not seq.prompt_stage_processing_finished:
                 running.append(seq)
                 continue
 

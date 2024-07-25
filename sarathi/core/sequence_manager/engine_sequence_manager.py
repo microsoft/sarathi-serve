@@ -2,6 +2,7 @@ from typing import List, Union
 
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
+from sarathi.config import SystemConfig
 from sarathi.core.datatypes.sequence import Sequence
 from sarathi.core.sequence_manager.base_sequence_manager import BaseSequenceManager
 from sarathi.transformers_utils.tokenizer import detokenize_incrementally
@@ -9,8 +10,12 @@ from sarathi.transformers_utils.tokenizer import detokenize_incrementally
 
 class EngineSequenceManager(BaseSequenceManager):
 
-    def __init__(self, tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast]):
-        super().__init__()
+    def __init__(
+        self,
+        tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
+        config: SystemConfig,
+    ):
+        super().__init__(config)
         self.tokenizer = tokenizer
 
     def _decode_seq(self, seq: Sequence) -> None:

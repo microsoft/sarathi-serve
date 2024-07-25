@@ -505,6 +505,10 @@ def get_data_parallel_rank():
     return torch.distributed.get_rank(group=get_data_parallel_group())
 
 
+def get_rank():
+    return torch.distributed.get_rank()
+
+
 def destroy_model_parallel():
     """Set the groups to none."""
     global _MODEL_PARALLEL_GROUP
