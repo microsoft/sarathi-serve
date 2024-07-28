@@ -11,7 +11,6 @@ from sarathi.metrics.cuda_timer import CudaTimer
 KVCache = Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]
 
 class BaseAttentionWrapper(ABC):
-    # _inst = None
 
     def __init__(
         self,
@@ -41,6 +40,14 @@ class BaseAttentionWrapper(ABC):
         if self._timers.get((operation, layer_id)) is None:
             self._timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
         return self._timers.get((operation, layer_id))
+    
+    @abstractmethod 
+    def init_gpu_cache(self, num_gpu_blocks: int) -> None:
+        pass
+    
+    @abstractmethod
+    def get_cache_block_size(self) -> int:
+        pass
 
     @abstractmethod
     def begin_forward(
@@ -48,12 +55,6 @@ class BaseAttentionWrapper(ABC):
         seq_metadata_list: List[SequenceMetadata],
     ) -> None:
         pass
-
-    # @classmethod
-    # def get_instance(cls):
-    #     if cls._inst is None:
-    #         cls._inst = cls()
-    #     return cls._inst
 
     @abstractmethod
     def end_forward(self):

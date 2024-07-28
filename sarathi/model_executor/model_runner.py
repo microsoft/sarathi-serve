@@ -40,14 +40,6 @@ class ModelRunner:
         
         self.model = get_model(self.config.model_config)
 
-        # get_attention_wrapper().init(
-        #     config.model_config,
-        #     config.parallel_config,
-        #     config.cache_config.num_gpu_blocks,
-        #     config.cache_config.block_size,
-        #     self.device,
-        # )
-
         self.sampler: Optional[Sampler] = None
         if self.model.lm_head:
             self.sampler = Sampler(

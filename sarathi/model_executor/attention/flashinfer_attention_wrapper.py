@@ -11,7 +11,6 @@ from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentio
 KVCache = Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]
 
 class FlashinferAttentionWrapper(BaseAttentionWrapper):
-    # _inst = None
 
     def __init__(
         self,
@@ -53,7 +52,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
     def to_int_tensor(self, data: List[int]) -> torch.Tensor:
         return torch.tensor(data, dtype=torch.int32, device="cuda")
     
-    def init_gpu_cache(self, num_gpu_blocks: int) -> List[torch.Tensor]:
+    def init_gpu_cache(self, num_gpu_blocks: int) -> None:
         gpu_cache: List[torch.Tensor] = []
         self.num_gpu_blocks = num_gpu_blocks
 
