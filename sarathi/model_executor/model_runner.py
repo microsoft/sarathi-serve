@@ -63,6 +63,9 @@ class ModelRunner:
         self._model_execution_e2e_timer = CpuTimer(
             CpuOperationMetrics.MODEL_EXECUTION_E2E, rank=self.rank
         )
+    
+    def init_attention_cache(self, num_gpu_blocks: int):
+        self.attention_backend_wrapper.init_gpu_cache(num_gpu_blocks)
 
     def _prepare_inputs(
         self,
@@ -208,9 +211,7 @@ class ModelRunner:
         torch.cuda.synchronize()
         peak_memory = torch.cuda.max_memory_allocated()
         total_gpu_memory = get_gpu_memory()
-        cache_block_size = self.attention_backend_wrapper.get_cache_block_size(
-            block_size, self.config.model_config, self.config.parallel_config
-        )
+        cache_block_size = self.attention_backend_wrapper.get_cache_block_size()
         num_gpu_blocks = int(
             (total_gpu_memory * gpu_memory_utilization - peak_memory)
             // cache_block_size
@@ -238,6 +239,8 @@ class ModelRunner:
         with self._model_execution_e2e_timer:
             # Execute the model.
             try:
+                
+                #TODO (vkomperla3): Make attention backend changes for all Model types (falcon, internlm, etc.)
                 output = self.model(
                     hidden_states=input_tokens,
                     positions=input_positions,

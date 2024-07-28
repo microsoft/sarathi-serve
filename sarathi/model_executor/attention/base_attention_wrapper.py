@@ -8,6 +8,7 @@ from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
 
+KVCache = Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]
 
 class BaseAttentionWrapper(ABC):
     # _inst = None

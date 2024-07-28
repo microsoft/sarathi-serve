@@ -39,7 +39,7 @@ from sarathi.model_executor.weight_utils import (
     load_tensor_parallel_weights,
 )
 from sarathi.transformers_utils.configs.qwen import QWenConfig
-from sarathi.worker.cache_engine import KVCache
+from sarathi.core.datatypes.block import KVCache
 
 
 class QWenMLP(nn.Module):

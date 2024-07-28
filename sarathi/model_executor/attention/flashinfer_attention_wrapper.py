@@ -48,21 +48,22 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.append_kv_page_indptr_tensor = None
         self.append_kv_last_page_len_tensor = None
         
-        # Initialize the cache.
-        self.gpu_cache = self.allocate_gpu_cache()
+        self.gpu_cache = []
 
     def to_int_tensor(self, data: List[int]) -> torch.Tensor:
         return torch.tensor(data, dtype=torch.int32, device="cuda")
     
-    def allocate_gpu_cache(self) -> List[torch.Tensor]:
+    def init_gpu_cache(self, num_gpu_blocks: int) -> List[torch.Tensor]:
         gpu_cache: List[torch.Tensor] = []
+        self.num_gpu_blocks = num_gpu_blocks
 
         for _ in range(self.num_layers):
             gpu_blocks = self.get_cache_block(
                 self.num_gpu_blocks, dtype=self.dtype, device="cuda"
             )
             gpu_cache.append(gpu_blocks)
-        return gpu_cache
+        
+        self.gpu_cache = gpu_cache
 
     def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
         return torch.randn(
@@ -78,7 +79,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         key_cache_block = self.block_size * self.num_kv_heads * self.head_dim
         value_cache_block = key_cache_block
         total = self.num_layers * (key_cache_block + value_cache_block)
-        dtype_size = self.dtype
+        dtype_size = _get_dtype_size(self.dtype)
         return dtype_size * total
 
     def begin_forward(
@@ -279,6 +280,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             output = output.reshape(-1, self.num_q_heads * self.head_dim)
 
         return output
-
+    
 def _get_dtype_size(dtype: torch.dtype) -> int:
-    return torch.tensor([], dtype=dtype).element_size()
+        return torch.tensor([], dtype=dtype).element_size()

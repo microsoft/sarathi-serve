@@ -26,7 +26,7 @@ from sarathi.model_executor.weight_utils import (
     load_padded_tensor_parallel_vocab,
     load_tensor_parallel_weights,
 )
-from sarathi.worker.cache_engine import KVCache
+from sarathi.core.datatypes.block import KVCache
 
 
 class InternLMMLP(nn.Module):

@@ -21,6 +21,7 @@
 import math
 from typing import List, Optional, Union
 
+from sarathi.core.datatypes.block import KVCache
 import torch
 from torch import nn
 from torch.nn import LayerNorm
@@ -51,7 +52,6 @@ from sarathi.model_executor.weight_utils import (
     load_tensor_parallel_weights,
 )
 from sarathi.transformers_utils.configs import RWConfig
-from sarathi.worker.cache_engine import KVCache
 
 FalconConfig = Union[HF_FalconConfig, RWConfig]
 

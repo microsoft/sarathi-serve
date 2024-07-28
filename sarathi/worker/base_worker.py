@@ -146,12 +146,14 @@ class BaseWorker:
     def init_cache_engine(self, cache_config: CacheConfig) -> None:
         torch.cuda.set_device(self.device)
 
-        # self.config.cache_config = cache_config
+        self.config.cache_config = cache_config
 
         # self.cache_engine = CacheEngine(
         #     self.config,
         # )
         # self.gpu_cache = self.cache_engine.gpu_cache
+
+        self.model_runner.init_attention_cache(cache_config.num_gpu_blocks)
 
         self.seq_manager = WorkerSequenceManager(
             self.config,
