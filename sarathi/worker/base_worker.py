@@ -25,7 +25,6 @@ from sarathi.model_executor.parallel_utils.parallel_state import (
     initialize_model_parallel,
 )
 from sarathi.utils.threading_utils import exit_on_error, synchronized
-from sarathi.worker.cache_engine import CacheEngine
 
 logger = init_logger(__name__)
 
@@ -62,7 +61,7 @@ class BaseWorker:
         # Sequence manager also needs number of blocks for initialization
         self.seq_manager = None
 
-        set_attention_backend(config.worker_config.attention_backend)
+        # set_attention_backend(config.worker_config.attention_backend)
 
         self._verify_parallel_config()
         self.metrics_store = MetricsStore.get_or_create_instance(
@@ -147,12 +146,12 @@ class BaseWorker:
     def init_cache_engine(self, cache_config: CacheConfig) -> None:
         torch.cuda.set_device(self.device)
 
-        self.config.cache_config = cache_config
+        # self.config.cache_config = cache_config
 
-        self.cache_engine = CacheEngine(
-            self.config,
-        )
-        self.gpu_cache = self.cache_engine.gpu_cache
+        # self.cache_engine = CacheEngine(
+        #     self.config,
+        # )
+        # self.gpu_cache = self.cache_engine.gpu_cache
 
         self.seq_manager = WorkerSequenceManager(
             self.config,
@@ -185,7 +184,6 @@ class BaseWorker:
 
         sampler_outputs = self.model_runner.run(
             seq_metadata_list,
-            self.gpu_cache,
         )
 
         self.on_step_completed(scheduler_outputs, sampler_outputs)

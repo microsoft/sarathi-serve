@@ -1,5 +1,7 @@
 from typing import List, Optional, Tuple
 
+from sarathi.model_executor.attention.attention_backend_registry import AttentionBackendRegistry
+from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 import torch
 import torch.distributed
 
@@ -14,7 +16,6 @@ from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.sampler import Sampler
 from sarathi.model_executor.utils import pad_to_alignment
 from sarathi.utils import get_gpu_memory
-from sarathi.worker.cache_engine import CacheEngine
 
 logger = init_logger(__name__)
 
@@ -31,13 +32,21 @@ class ModelRunner:
         self.device = device
         self.rank = rank
 
+        self.attention_backend_wrapper: BaseAttentionWrapper = AttentionBackendRegistry.get(
+            config.worker_config.attention_backend, 
+            config.model_config, config.parallel_config, 
+            config.cache_config, 
+            device)
+        
         self.model = get_model(self.config.model_config)
-        get_attention_wrapper().init(
-            config.model_config,
-            config.parallel_config,
-            config.cache_config.block_size,
-            self.device,
-        )
+
+        # get_attention_wrapper().init(
+        #     config.model_config,
+        #     config.parallel_config,
+        #     config.cache_config.num_gpu_blocks,
+        #     config.cache_config.block_size,
+        #     self.device,
+        # )
 
         self.sampler: Optional[Sampler] = None
         if self.model.lm_head:
@@ -181,7 +190,7 @@ class ModelRunner:
                 seq_metadata_list.append(seq_metadata)
 
         input_tokens, input_positions = self._prepare_inputs(seq_metadata_list)
-        get_attention_wrapper().begin_forward(seq_metadata_list)
+        self.attention_backend_wrapper.begin_forward(seq_metadata_list)
 
         # Execute the model.
         num_layers = self.config.model_config.get_num_layers(
@@ -191,6 +200,7 @@ class ModelRunner:
             hidden_states=input_tokens,
             positions=input_positions,
             kv_caches=[None] * num_layers,
+            attention_backend_wrapper=self.attention_backend_wrapper,
         )
 
         # Calculate the number of blocks that can be allocated with the
@@ -198,7 +208,7 @@ class ModelRunner:
         torch.cuda.synchronize()
         peak_memory = torch.cuda.max_memory_allocated()
         total_gpu_memory = get_gpu_memory()
-        cache_block_size = CacheEngine.get_cache_block_size(
+        cache_block_size = self.attention_backend_wrapper.get_cache_block_size(
             block_size, self.config.model_config, self.config.parallel_config
         )
         num_gpu_blocks = int(
@@ -208,7 +218,7 @@ class ModelRunner:
         num_gpu_blocks = max(num_gpu_blocks, 0)
         torch.cuda.empty_cache()
 
-        get_attention_wrapper().end_forward()
+        self.attention_backend_wrapper.end_forward()
 
         # Reset the seed to ensure that the random state is not affected by
         # the model initialization and profiling.
@@ -218,13 +228,12 @@ class ModelRunner:
     def run(
         self,
         seq_metadata_list: List[SequenceMetadata],
-        gpu_cache: Optional[List[torch.Tensor]] = None,
     ) -> torch.Tensor:
         # Prepare input tensors.
         with self._prepare_inputs_e2e_timer:
             input_tokens, input_positions = self._prepare_inputs(seq_metadata_list)
 
-        get_attention_wrapper().begin_forward(seq_metadata_list)
+        self.attention_backend_wrapper.begin_forward(seq_metadata_list)
 
         with self._model_execution_e2e_timer:
             # Execute the model.
@@ -232,7 +241,8 @@ class ModelRunner:
                 output = self.model(
                     hidden_states=input_tokens,
                     positions=input_positions,
-                    kv_caches=gpu_cache,
+                    kv_caches=self.attention_backend_wrapper.gpu_cache,
+                    attention_backend_wrapper=self.attention_backend_wrapper,
                 )
             except RuntimeError as e:
                 logger.error(
@@ -244,6 +254,6 @@ class ModelRunner:
             if self.sampler is not None:
                 output = self.sampler(output, seq_metadata_list)
 
-        get_attention_wrapper().end_forward()
+        self.attention_backend_wrapper.end_forward()
 
         return output

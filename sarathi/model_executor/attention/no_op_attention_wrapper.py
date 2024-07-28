@@ -8,9 +8,9 @@ from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentio
 
 
 class NoOpAttentionWrapper(BaseAttentionWrapper):
-    _inst = None
+    # _inst = None
 
-    def init(
+    def __init__(
         self,
         model_config: ModelConfig,
         parallel_config: ParallelConfig,

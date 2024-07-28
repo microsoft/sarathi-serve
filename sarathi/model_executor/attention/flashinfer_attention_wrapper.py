@@ -1,25 +1,26 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple, Union
 
+from sarathi.config.config import CacheConfig, ModelConfig, ParallelConfig
 import torch
 from flashinfer import BatchPrefillWithPagedKVCacheWrapper, append_paged_kv_cache
 
-from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 
+KVCache = Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]
 
 class FlashinferAttentionWrapper(BaseAttentionWrapper):
-    _inst = None
+    # _inst = None
 
-    def init(
+    def __init__(
         self,
         model_config: ModelConfig,
         parallel_config: ParallelConfig,
-        block_size: int,
+        cache_config: CacheConfig,
         device: torch.device,
     ):
-        super().init(model_config, parallel_config, block_size, device)
+        super().__init__(model_config, parallel_config, cache_config, device)
 
         prefill_workspace_buffer = torch.empty(
             128 * 1024 * 1024, dtype=torch.uint8, device=device
@@ -46,9 +47,22 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.append_kv_page_indices_tensor = None
         self.append_kv_page_indptr_tensor = None
         self.append_kv_last_page_len_tensor = None
+        
+        # Initialize the cache.
+        self.gpu_cache = self.allocate_gpu_cache()
 
     def to_int_tensor(self, data: List[int]) -> torch.Tensor:
         return torch.tensor(data, dtype=torch.int32, device="cuda")
+    
+    def allocate_gpu_cache(self) -> List[torch.Tensor]:
+        gpu_cache: List[torch.Tensor] = []
+
+        for _ in range(self.num_layers):
+            gpu_blocks = self.get_cache_block(
+                self.num_gpu_blocks, dtype=self.dtype, device="cuda"
+            )
+            gpu_cache.append(gpu_blocks)
+        return gpu_cache
 
     def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
         return torch.randn(
@@ -59,6 +73,13 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.head_dim,
             **kwargs,
         )
+
+    def get_cache_block_size(self) -> int:
+        key_cache_block = self.block_size * self.num_kv_heads * self.head_dim
+        value_cache_block = key_cache_block
+        total = self.num_layers * (key_cache_block + value_cache_block)
+        dtype_size = self.dtype
+        return dtype_size * total
 
     def begin_forward(
         self,
@@ -258,3 +279,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             output = output.reshape(-1, self.num_q_heads * self.head_dim)
 
         return output
+
+def _get_dtype_size(dtype: torch.dtype) -> int:
+    return torch.tensor([], dtype=dtype).element_size()

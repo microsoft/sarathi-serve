@@ -1,22 +1,22 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple, Union
 
+from sarathi.config.config import CacheConfig, ModelConfig, ParallelConfig
 import torch
 
-from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
 
 
 class BaseAttentionWrapper(ABC):
-    _inst = None
+    # _inst = None
 
-    def init(
+    def __init__(
         self,
         model_config: ModelConfig,
         parallel_config: ParallelConfig,
-        block_size: int,
+        cache_config: CacheConfig,
         device: torch.device,
     ):
         self.device = device
@@ -24,7 +24,10 @@ class BaseAttentionWrapper(ABC):
         self.num_kv_heads = model_config.get_num_kv_heads(parallel_config)
         self.head_dim = model_config.get_head_size()
         self.dtype = model_config.dtype
-        self.block_size = block_size
+        self.block_size = cache_config.block_size
+        self.num_layers = model_config.get_num_layers(parallel_config)
+        self.num_gpu_blocks = cache_config.num_gpu_blocks
+        self.gpu_cache = None
         self._timers = {}
 
     """
@@ -45,11 +48,11 @@ class BaseAttentionWrapper(ABC):
     ) -> None:
         pass
 
-    @classmethod
-    def get_instance(cls):
-        if cls._inst is None:
-            cls._inst = cls()
-        return cls._inst
+    # @classmethod
+    # def get_instance(cls):
+    #     if cls._inst is None:
+    #         cls._inst = cls()
+    #     return cls._inst
 
     @abstractmethod
     def end_forward(self):
