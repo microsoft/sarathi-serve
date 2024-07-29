@@ -56,7 +56,7 @@ class ModelRunner:
             CpuOperationMetrics.MODEL_EXECUTION_E2E, rank=self.rank
         )
     
-    def init_attention_cache(self, num_gpu_blocks: int):
+    def init_kv_cache(self, num_gpu_blocks: int):
         self.attention_backend_wrapper.init_gpu_cache(num_gpu_blocks)
 
     def _prepare_inputs(

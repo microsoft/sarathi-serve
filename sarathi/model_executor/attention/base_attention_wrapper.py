@@ -1,14 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
-from sarathi.config.config import CacheConfig, ModelConfig, ParallelConfig
+from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
 import torch
 
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
-
-KVCache = Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]
 
 class BaseAttentionWrapper(ABC):
 
@@ -26,9 +24,9 @@ class BaseAttentionWrapper(ABC):
         self.dtype = model_config.dtype
         self.block_size = cache_config.block_size
         self.num_layers = model_config.get_num_layers(parallel_config)
-        self.num_gpu_blocks = cache_config.num_gpu_blocks
-        self.gpu_cache = None
-        self._timers = {}
+        self.num_gpu_blocks: int = cache_config.num_gpu_blocks
+        self.gpu_cache: Optional[List[torch.Tensor]] = None
+        self._timers:  Optional[Dict[Tuple[OperationMetrics, int], CudaTimer]] = {}
 
     """
     For a given model, all layers same the same AttentionWrapper instance.
@@ -41,9 +39,27 @@ class BaseAttentionWrapper(ABC):
             self._timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
         return self._timers.get((operation, layer_id))
     
-    @abstractmethod 
     def init_gpu_cache(self, num_gpu_blocks: int) -> None:
-        pass
+        gpu_cache: List[torch.Tensor] = []
+        self.num_gpu_blocks = num_gpu_blocks
+
+        for _ in range(self.num_layers):
+            gpu_blocks = self.get_cache_block(
+                self.num_gpu_blocks, dtype=self.dtype, device="cuda"
+            )
+            gpu_cache.append(gpu_blocks)
+        
+        self.gpu_cache = gpu_cache
+
+    def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
+        return torch.randn(
+            num_blocks,
+            2,
+            self.block_size,
+            self.num_kv_heads,
+            self.head_dim,
+            **kwargs,
+        )
     
     @abstractmethod
     def get_cache_block_size(self) -> int:

@@ -146,7 +146,7 @@ class BaseWorker:
 
         self.config.cache_config = cache_config
 
-        self.model_runner.init_attention_cache(cache_config.num_gpu_blocks)
+        self.model_runner.init_kv_cache(cache_config.num_gpu_blocks)
 
         self.seq_manager = WorkerSequenceManager(
             self.config,
