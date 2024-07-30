@@ -17,7 +17,6 @@ from sarathi.core.sequence_manager.worker_sequence_manager import WorkerSequence
 from sarathi.logger import init_logger
 from sarathi.metrics.metrics_store import MetricsStore
 from sarathi.model_executor import set_random_seed
-from sarathi.model_executor.attention import set_attention_backend
 from sarathi.model_executor.model_runner import ModelRunner
 from sarathi.model_executor.parallel_utils.parallel_state import (
     get_pipeline_model_parallel_rank,

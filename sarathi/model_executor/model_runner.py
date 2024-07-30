@@ -1,7 +1,5 @@
 from typing import List, Optional, Tuple
 
-from sarathi.model_executor.attention.attention_backend_registry import AttentionBackendRegistry
-from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 import torch
 import torch.distributed
 
@@ -12,7 +10,8 @@ from sarathi.logger import init_logger
 from sarathi.metrics.constants import CpuOperationMetrics
 from sarathi.metrics.cpu_timer import CpuTimer
 from sarathi.model_executor import get_model, set_random_seed
-from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.model_executor.attention.attention_backend_registry import AttentionBackendRegistry
+from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 from sarathi.model_executor.layers.sampler import Sampler
 from sarathi.model_executor.utils import pad_to_alignment
 from sarathi.utils import get_gpu_memory
@@ -194,7 +193,6 @@ class ModelRunner:
         self.model(
             hidden_states=input_tokens,
             positions=input_positions,
-            kv_caches=[None] * num_layers,
             attention_backend_wrapper=self.attention_backend_wrapper,
         )
 
@@ -236,7 +234,6 @@ class ModelRunner:
                 output = self.model(
                     hidden_states=input_tokens,
                     positions=input_positions,
-                    kv_caches=self.attention_backend_wrapper.gpu_cache,
                     attention_backend_wrapper=self.attention_backend_wrapper,
                 )
             except RuntimeError as e:

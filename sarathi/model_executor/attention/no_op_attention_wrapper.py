@@ -35,7 +35,7 @@ class NoOpAttentionWrapper(BaseAttentionWrapper):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        kv_cache: Tuple[torch.Tensor, torch.Tensor],
+        layer_cache_idx: int,
         softmax_scale: float = 1.0,
         layer_id: Optional[int] = None,
     ) -> torch.Tensor:

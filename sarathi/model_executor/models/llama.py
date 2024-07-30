@@ -171,7 +171,7 @@ class LlamaAttention(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        kv_cache: KVCache,
+        layer_cache_idx: int,
         attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         qkv, _ = self.qkv_proj(hidden_states)
@@ -182,7 +182,7 @@ class LlamaAttention(nn.Module):
             q,
             k,
             v,
-            kv_cache,
+            layer_cache_idx,
             self.scaling,
             self.layer_id,
         )
@@ -235,7 +235,7 @@ class LlamaDecoderLayer(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        kv_cache: KVCache,
+        layer_cache_idx: int,
         attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         # Self Attention
@@ -244,7 +244,7 @@ class LlamaDecoderLayer(nn.Module):
         hidden_states = self.self_attn(
             positions=positions,
             hidden_states=hidden_states,
-            kv_cache=kv_cache,
+            layer_cache_idx=layer_cache_idx,
             attention_backend_wrapper=attention_backend_wrapper,
         )
         hidden_states = residual + hidden_states
@@ -299,7 +299,6 @@ class LlamaModel(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        kv_caches: List[KVCache],
         attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         if self.embed_tokens:
@@ -310,7 +309,7 @@ class LlamaModel(nn.Module):
             hidden_states = layer(
                 positions,
                 hidden_states,
-                kv_caches[i],
+                i,
                 attention_backend_wrapper
             )
 
@@ -348,7 +347,6 @@ class LlamaForCausalLM(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        kv_caches: List[KVCache],
         attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         if not self.is_pipeline_first_stage:
@@ -360,7 +358,7 @@ class LlamaForCausalLM(nn.Module):
             )
             hidden_states = recv(hidden_states)
 
-        hidden_states = self.model(hidden_states, positions, kv_caches, attention_backend_wrapper)
+        hidden_states = self.model(hidden_states, positions, attention_backend_wrapper)
 
         if not self.is_pipeline_last_stage:
             send(hidden_states)

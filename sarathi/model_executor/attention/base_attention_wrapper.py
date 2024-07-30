@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple, Union
 
-from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
 import torch
 
+from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
@@ -82,7 +82,7 @@ class BaseAttentionWrapper(ABC):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        kv_cache: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+        layer_cache_idx: int,
         softmax_scale: float = 1.0,
         layer_id: Optional[int] = None,
     ) -> torch.Tensor:
