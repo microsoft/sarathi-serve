@@ -39,30 +39,25 @@ class BaseAttentionWrapper(ABC):
             self._timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
         return self._timers.get((operation, layer_id))
     
-    def init_gpu_cache(self, num_gpu_blocks: int) -> None:
-        gpu_cache: List[torch.Tensor] = []
-        self.num_gpu_blocks = num_gpu_blocks
-
-        for _ in range(self.num_layers):
-            gpu_blocks = self.get_cache_block(
-                self.num_gpu_blocks, dtype=self.dtype, device="cuda"
-            )
-            gpu_cache.append(gpu_blocks)
-        
-        self.gpu_cache = gpu_cache
-
-    def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
-        return torch.randn(
-            num_blocks,
-            2,
-            self.block_size,
-            self.num_kv_heads,
-            self.head_dim,
-            **kwargs,
-        )
-    
-    @abstractmethod
     def get_cache_block_size(self) -> int:
+        key_cache_block = self.block_size * self.num_kv_heads * self.head_dim
+        value_cache_block = key_cache_block
+        total = self.num_layers * (key_cache_block + value_cache_block)
+        dtype_size = _get_dtype_size(self.dtype)
+        return dtype_size * total
+
+    @abstractmethod
+    def init_gpu_cache(
+        self, 
+        num_gpu_blocks: int
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def get_cache_block(
+        self,
+        num_blocks: int, **kwargs
+    ) -> torch.Tensor:
         pass
 
     @abstractmethod
@@ -87,3 +82,6 @@ class BaseAttentionWrapper(ABC):
         layer_id: Optional[int] = None,
     ) -> torch.Tensor:
         pass
+
+def _get_dtype_size(dtype: torch.dtype) -> int:
+    return torch.tensor([], dtype=dtype).element_size()

@@ -18,6 +18,18 @@ class NoOpAttentionWrapper(BaseAttentionWrapper):
     ):
         self.device = device
 
+    def init_gpu_cache(
+        self, 
+        num_gpu_blocks: int
+    ) -> None:
+        pass
+
+    def get_cache_block(
+        self,
+        num_blocks: int, **kwargs
+    ) -> torch.Tensor:
+        pass
+
     def get_cache_block_size(self) -> int:
         pass
 
