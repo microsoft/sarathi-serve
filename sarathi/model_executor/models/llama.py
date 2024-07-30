@@ -26,14 +26,13 @@ The input of the model is flattened to a 1D tensor of tokens.
 """
 from typing import Any, Dict, List, Optional
 
-from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 import torch
 from torch import nn
 from transformers import LlamaConfig
 
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
-from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 from sarathi.model_executor.layers.activation import SiluAndMul
 from sarathi.model_executor.layers.layernorm import RMSNorm
 from sarathi.model_executor.layers.rotary_embedding import get_rope
@@ -56,7 +55,6 @@ from sarathi.model_executor.weight_utils import (
     load_padded_tensor_parallel_vocab,
     load_tensor_parallel_weights,
 )
-from sarathi.core.datatypes.block import KVCache
 
 
 class LlamaMLP(nn.Module):

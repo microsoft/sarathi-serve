@@ -7,7 +7,7 @@ from transformers import LlamaConfig
 
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
-from sarathi.model_executor.attention import get_attention_wrapper
+from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 from sarathi.model_executor.layers.activation import SiluAndMul
 from sarathi.model_executor.layers.layernorm import RMSNorm
 from sarathi.model_executor.layers.rotary_embedding import get_rope
@@ -26,7 +26,6 @@ from sarathi.model_executor.weight_utils import (
     load_padded_tensor_parallel_vocab,
     load_tensor_parallel_weights,
 )
-from sarathi.core.datatypes.block import KVCache
 
 
 class InternLMMLP(nn.Module):
@@ -125,7 +124,8 @@ class InternLMAttention(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        kv_cache: KVCache,
+        layer_cache_idx: int,
+        attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         qkv, _ = self.qkv_proj(hidden_states)
         q, k, v = qkv.chunk(chunks=3, dim=-1)
@@ -133,11 +133,11 @@ class InternLMAttention(nn.Module):
         with self._attn_rope_timer:
             q, k = self.rotary_emb(positions, q, k)
 
-        attn_output = get_attention_wrapper().forward(
+        attn_output = attention_backend_wrapper.forward(
             q,
             k,
             v,
-            kv_cache,
+            layer_cache_idx,
             self.scaling,
         )
 
@@ -174,7 +174,8 @@ class InternLMDecoderLayer(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        kv_cache: KVCache,
+        layer_cache_idx: int,
+        attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         # Self Attention
         residual = hidden_states
@@ -182,7 +183,8 @@ class InternLMDecoderLayer(nn.Module):
         hidden_states = self.self_attn(
             positions=positions,
             hidden_states=hidden_states,
-            kv_cache=kv_cache,
+            layer_cache_idx=layer_cache_idx,
+            attention_backend_wrapper=attention_backend_wrapper,
         )
         hidden_states = residual + hidden_states
 
@@ -215,7 +217,7 @@ class InternLMModel(nn.Module):
         self,
         input_ids: torch.Tensor,
         positions: torch.Tensor,
-        kv_caches: List[KVCache],
+        attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
         hidden_states = self.embed_tokens(input_ids)
         for i in range(len(self.layers)):
@@ -223,7 +225,8 @@ class InternLMModel(nn.Module):
             hidden_states = layer(
                 positions,
                 hidden_states,
-                kv_caches[i],
+                i,
+                attention_backend_wrapper
             )
         hidden_states = self.norm(hidden_states)
         return hidden_states
@@ -248,9 +251,9 @@ class InternLMForCausalLM(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        kv_caches: List[KVCache],
+        attention_backend_wrapper: BaseAttentionWrapper,
     ) -> torch.Tensor:
-        hidden_states = self.model(hidden_states, positions, kv_caches)
+        hidden_states = self.model(hidden_states, positions, attention_backend_wrapper)
         return hidden_states
 
     _column_parallel_weights = ["qkv_proj.weight", "gate_proj.weight", "up_proj.weight"]
