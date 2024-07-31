@@ -8,6 +8,7 @@ from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
 
+
 class BaseAttentionWrapper(ABC):
 
     def __init__(
@@ -26,7 +27,7 @@ class BaseAttentionWrapper(ABC):
         self.num_layers = model_config.get_num_layers(parallel_config)
         self.num_gpu_blocks: int = cache_config.num_gpu_blocks
         self.gpu_cache: Optional[List[torch.Tensor]] = None
-        self._timers:  Optional[Dict[Tuple[OperationMetrics, int], CudaTimer]] = {}
+        self._timers: Optional[Dict[Tuple[OperationMetrics, int], CudaTimer]] = {}
 
     """
     For a given model, all layers same the same AttentionWrapper instance.
@@ -38,7 +39,7 @@ class BaseAttentionWrapper(ABC):
         if self._timers.get((operation, layer_id)) is None:
             self._timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
         return self._timers.get((operation, layer_id))
-    
+
     def get_cache_block_size(self) -> int:
         key_cache_block = self.block_size * self.num_kv_heads * self.head_dim
         value_cache_block = key_cache_block
@@ -47,17 +48,11 @@ class BaseAttentionWrapper(ABC):
         return dtype_size * total
 
     @abstractmethod
-    def init_gpu_cache(
-        self, 
-        num_gpu_blocks: int
-    ) -> None:
+    def init_gpu_cache(self, num_gpu_blocks: int) -> None:
         pass
 
     @abstractmethod
-    def get_cache_block(
-        self,
-        num_blocks: int, **kwargs
-    ) -> torch.Tensor:
+    def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
         pass
 
     @abstractmethod
@@ -82,6 +77,7 @@ class BaseAttentionWrapper(ABC):
         layer_id: Optional[int] = None,
     ) -> torch.Tensor:
         pass
+
 
 def _get_dtype_size(dtype: torch.dtype) -> int:
     return torch.tensor([], dtype=dtype).element_size()

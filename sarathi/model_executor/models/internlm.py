@@ -223,10 +223,7 @@ class InternLMModel(nn.Module):
         for i in range(len(self.layers)):
             layer = self.layers[i]
             hidden_states = layer(
-                positions,
-                hidden_states,
-                i,
-                attention_backend_wrapper
+                positions, hidden_states, i, attention_backend_wrapper
             )
         hidden_states = self.norm(hidden_states)
         return hidden_states

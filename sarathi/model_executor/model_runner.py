@@ -10,7 +10,9 @@ from sarathi.logger import init_logger
 from sarathi.metrics.constants import CpuOperationMetrics
 from sarathi.metrics.cpu_timer import CpuTimer
 from sarathi.model_executor import get_model, set_random_seed
-from sarathi.model_executor.attention.attention_backend_registry import AttentionBackendRegistry
+from sarathi.model_executor.attention.attention_backend_registry import (
+    AttentionBackendRegistry,
+)
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 from sarathi.model_executor.layers.sampler import Sampler
 from sarathi.model_executor.utils import pad_to_alignment
@@ -31,12 +33,16 @@ class ModelRunner:
         self.device = device
         self.rank = rank
 
-        self.attention_backend_wrapper: BaseAttentionWrapper = AttentionBackendRegistry.get(
-            config.worker_config.attention_backend, 
-            config.model_config, config.parallel_config, 
-            config.cache_config, 
-            device)
-        
+        self.attention_backend_wrapper: BaseAttentionWrapper = (
+            AttentionBackendRegistry.get(
+                config.worker_config.attention_backend,
+                config.model_config,
+                config.parallel_config,
+                config.cache_config,
+                device,
+            )
+        )
+
         self.model = get_model(self.config.model_config)
 
         self.sampler: Optional[Sampler] = None
@@ -54,7 +60,7 @@ class ModelRunner:
         self._model_execution_e2e_timer = CpuTimer(
             CpuOperationMetrics.MODEL_EXECUTION_E2E, rank=self.rank
         )
-    
+
     def init_kv_cache(self, num_gpu_blocks: int):
         self.attention_backend_wrapper.init_gpu_cache(num_gpu_blocks)
 
@@ -229,8 +235,7 @@ class ModelRunner:
         with self._model_execution_e2e_timer:
             # Execute the model.
             try:
-                
-                #TODO (vkomperla3): Make attention backend changes for all Model types (falcon, internlm, etc.)
+
                 output = self.model(
                     hidden_states=input_tokens,
                     positions=input_positions,

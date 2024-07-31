@@ -8,6 +8,7 @@ from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 
+
 class FlashinferAttentionWrapper(BaseAttentionWrapper):
 
     def __init__(
@@ -44,10 +45,10 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.append_kv_page_indices_tensor = None
         self.append_kv_page_indptr_tensor = None
         self.append_kv_last_page_len_tensor = None
-        
+
     def to_int_tensor(self, data: List[int]) -> torch.Tensor:
         return torch.tensor(data, dtype=torch.int32, device="cuda")
-    
+
     def init_gpu_cache(self, num_gpu_blocks: int) -> None:
         gpu_cache: List[torch.Tensor] = []
         self.num_gpu_blocks = num_gpu_blocks
@@ -57,7 +58,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 self.num_gpu_blocks, dtype=self.dtype, device="cuda"
             )
             gpu_cache.append(gpu_blocks)
-        
+
         self.gpu_cache = gpu_cache
 
     def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:

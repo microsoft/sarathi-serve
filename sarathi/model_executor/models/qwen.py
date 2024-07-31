@@ -245,10 +245,7 @@ class QWenModel(nn.Module):
         for i in range(len(self.h)):
             layer = self.h[i]
             hidden_states = layer(
-                positions,
-                hidden_states,
-                i,
-                attention_backend_wrapper
+                positions, hidden_states, i, attention_backend_wrapper
             )
         if self.ln_f:
             hidden_states = self.ln_f(hidden_states)
@@ -292,7 +289,9 @@ class QWenLMHeadModel(nn.Module):
                 device=hidden_states.device,
             )
             hidden_states = recv(hidden_states)
-        hidden_states = self.transformer(hidden_states, positions, attention_backend_wrapper)
+        hidden_states = self.transformer(
+            hidden_states, positions, attention_backend_wrapper
+        )
 
         if not self.is_pipeline_last_stage:
             send(hidden_states)

@@ -220,7 +220,7 @@ class MistralDecoderLayer(nn.Module):
             positions=positions,
             hidden_states=hidden_states,
             layer_cache_idx=layer_cache_idx,
-            attention_backend_wrapper=attention_backend_wrapper            
+            attention_backend_wrapper=attention_backend_wrapper,
         )
         hidden_states = residual + hidden_states
 

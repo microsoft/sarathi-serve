@@ -8,6 +8,7 @@ _BLANK_TOKEN_ID = -1
 
 KVCache = Union[Tuple[Tensor, Tensor], Tensor]
 
+
 class LogicalTokenBlock:
     """A block that stores a contiguous chunk of tokens from left to right.
 
