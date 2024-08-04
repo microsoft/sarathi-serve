@@ -246,3 +246,9 @@ class BenchmarkConfig(BaseEndpointConfig):
 
         if not self.time_limit:
             self.time_limit = float("inf")
+
+
+class ConfigParser:
+    @staticmethod
+    def get_config():
+        return BenchmarkConfig()
