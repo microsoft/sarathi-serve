@@ -27,7 +27,7 @@ class BaseAttentionWrapper(ABC):
         self.num_layers = model_config.get_num_layers(parallel_config)
         self.num_gpu_blocks: int = cache_config.num_gpu_blocks
         self.gpu_cache: Optional[List[torch.Tensor]] = None
-        self._timers: Optional[Dict[Tuple[OperationMetrics, int], CudaTimer]] = {}
+        self.timers: Optional[Dict[Tuple[OperationMetrics, int], CudaTimer]] = {}
 
     """
     For a given model, all layers same the same AttentionWrapper instance.
@@ -36,9 +36,9 @@ class BaseAttentionWrapper(ABC):
     """
 
     def get_timer(self, operation: OperationMetrics, layer_id: Optional[int] = None):
-        if self._timers.get((operation, layer_id)) is None:
-            self._timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
-        return self._timers.get((operation, layer_id))
+        if self.timers.get((operation, layer_id)) is None:
+            self.timers[(operation, layer_id)] = CudaTimer(operation, layer_id)
+        return self.timers.get((operation, layer_id))
 
     def get_cache_block_size(self) -> int:
         key_cache_block = self.block_size * self.num_kv_heads * self.head_dim
