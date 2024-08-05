@@ -1,12 +1,12 @@
 # Sarathi-Serve
 
-This is the official OSDI'24 artifact submission for paper #444, "Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve”.
+Sarathi-Serve is a high througput and low-latency LLM serving framework. Please refer to our [OSDI'24 paper](https://www.usenix.org/conference/osdi24/presentation/agrawal) for more details. 
 
 ## Setup
 
 ### Setup CUDA
 
-Sarathi-Serve has been tested with CUDA 12.1 on A100 and A40 GPUs.
+Sarathi-Serve has been tested with CUDA 12.3 on H100 and A100 GPUs.
 
 ### Clone repository
 
