@@ -1,8 +1,8 @@
 """Token blocks."""
 
 from typing import List, Tuple, Union
-from torch import Tensor
 
+from torch import Tensor
 
 _BLANK_TOKEN_ID = -1
 
