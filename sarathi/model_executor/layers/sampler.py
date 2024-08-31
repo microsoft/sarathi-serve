@@ -83,9 +83,6 @@ class Sampler(nn.Module):
         for i, seq_metadata in enumerate(seq_metadata_list):
             seq_id = seq_metadata.seq.seq_id
             outputs.append(SamplerOutput(seq_id, flashinfer_sample_result[i]))
-        torch_outputs = _sample(probs, logprobs, seq_metadata_list)
-        result = [a == b for a, b in zip(outputs, torch_outputs)]
-        print(all(result))
         return outputs
 
 
