@@ -15,10 +15,10 @@ from sarathi.model_executor.parallel_utils.tensor_parallel import (
     gather_from_tensor_model_parallel_region,
 )
 
-import flashinfer.sampling
 from flashinfer.sampling import (
-    top_k_top_p_sampling_from_probs as flashinfer_top_k_top_p_sampling,
+    top_k_top_p_sampling_from_logits as flashinfer_top_k_top_p_sampling_from_logits
 )
+
 
 _SAMPLING_EPS = 1e-5
 
@@ -64,24 +64,11 @@ class Sampler(nn.Module):
 
         # Apply top-p and top-k truncation.
         top_ps, top_ks = _get_top_p_top_k(seq_metadata_list, self.vocab_size)
-        assert len(top_ps) == len(top_ks) == logits.shape[0]
-        do_top_p = any(p < 1.0 - _SAMPLING_EPS for p in top_ps)
-        do_top_k = any(k != self.vocab_size for k in top_ks)
-        if do_top_p or do_top_k:
-            logits = _apply_top_p_top_k(logits, top_ps, top_ks)
-
-        # We use float32 for probabilities and log probabilities.
-        # Compute the probabilities.
-        probs = torch.softmax(logits, dim=-1, dtype=torch.float)
-        # Compute the log probabilities.
-        # Use log_softmax to ensure numerical stability.
-        logprobs = torch.log_softmax(logits, dim=-1, dtype=torch.float)
         top_ps = torch.tensor(top_ps, dtype=logits.dtype, device=logits.device)
         top_ks = torch.tensor(top_ks, dtype=torch.int, device=logits.device)
 
-        flashinfer_sample_result = _top_k_top_p_multinomial_with_flashinfer(
-            probs, top_ks, top_ps, 1
-        )
+        flashinfer_sample_result = _top_k_top_p_with_flashinfer(logits, top_ks, top_ps)
+
         outputs = []
         for i, seq_metadata in enumerate(seq_metadata_list):
             seq_id = seq_metadata.seq.seq_id
@@ -234,29 +221,16 @@ def _sample(
     return outputs
 
 
-def _top_k_top_p_multinomial_with_flashinfer(
-    probs: torch.Tensor, top_ks: torch.Tensor, top_ps: torch.Tensor, num_samples: int
+def _top_k_top_p_with_flashinfer(
+    logits: torch.Tensor, top_ks: torch.Tensor, top_ps: torch.Tensor
 ):
     max_top_k_round = 32
-    if num_samples > 1:
-        probs = probs.repeat_interleave(num_samples, dim=0)
-        top_ks = top_ks.repeat_interleave(num_samples)
-        top_ps = top_ps.repeat_interleave(num_samples)
-    batch_size = probs.shape[0]
-    uniform_samples = torch.empty((max_top_k_round, batch_size), device=probs.device)
+    batch_size = logits.shape[0]
+    uniform_samples = torch.empty((max_top_k_round, batch_size), device=logits.device)
     uniform_samples.uniform_()
 
-    batch_next_token_ids, success = flashinfer_top_k_top_p_sampling(
-        probs,
-        uniform_samples,
-        top_ks,
-        top_ps,
+    (batch_next_token_ids, success) = flashinfer_top_k_top_p_sampling_from_logits(
+        logits, uniform_samples, top_ks, top_ps
     )
-    if not success.all():
-        probs = flashinfer.sampling.top_k_renorm_prob(probs, top_ks)
-        probs = flashinfer.sampling.top_p_renorm_prob(probs, top_ps)
-        batch_next_token_ids = flashinfer.sampling.sampling_from_probs(
-            probs, uniform_samples[0]
-        )
 
-    return batch_next_token_ids.view(-1, num_samples)
+    return batch_next_token_ids.view(-1)
