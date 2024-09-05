@@ -4,6 +4,9 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
+from flashinfer.sampling import (
+    top_k_top_p_sampling_from_logits as flashinfer_top_k_top_p_sampling_from_logits,
+)
 
 from sarathi.core.datatypes.sampling_params import SamplingType
 from sarathi.core.datatypes.sequence import (
@@ -14,11 +17,6 @@ from sarathi.core.datatypes.sequence import (
 from sarathi.model_executor.parallel_utils.tensor_parallel import (
     gather_from_tensor_model_parallel_region,
 )
-
-from flashinfer.sampling import (
-    top_k_top_p_sampling_from_logits as flashinfer_top_k_top_p_sampling_from_logits
-)
-
 
 _SAMPLING_EPS = 1e-5
 
@@ -67,13 +65,14 @@ class Sampler(nn.Module):
         top_ps = torch.tensor(top_ps, dtype=logits.dtype, device=logits.device)
         top_ks = torch.tensor(top_ks, dtype=torch.int, device=logits.device)
 
-        flashinfer_sample_result = _top_k_top_p_with_flashinfer(logits, top_ks, top_ps)
+        flashinfer_sample_result = _top_k_top_p_with_flashinfer(
+            logits, top_ks, top_ps
+        ).cpu()
 
-        outputs = []
-        for i, seq_metadata in enumerate(seq_metadata_list):
-            seq_id = seq_metadata.seq.seq_id
-            outputs.append(SamplerOutput(seq_id, flashinfer_sample_result[i]))
-        return outputs
+        return [
+            SamplerOutput(seq_metadata_list[i].seq.seq_id, flashinfer_sample_result[i])
+            for i in range(len(seq_metadata_list))
+        ]
 
 
 def _get_logits(
