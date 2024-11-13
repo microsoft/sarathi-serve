@@ -123,4 +123,4 @@ def get_and_verify_max_len(
         rope_scaling = {"type": "linear", "factor": scaling_factor}
         hf_config.rope_scaling = rope_scaling
 
-    return max_model_len
+    return int(max_model_len)
