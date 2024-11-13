@@ -94,8 +94,7 @@ def get_and_verify_max_len(
         elif "rope_type" in rope_scaling:
             rope_type = rope_scaling["rope_type"]
         else:
-            raise ValueError(
-                "rope_scaling must have a 'type' or 'rope_type' key.")
+            raise ValueError("rope_scaling must have a 'type' or 'rope_type' key.")
 
     if rope_scaling is not None:
         if derived_max_model_len == float("inf"):
