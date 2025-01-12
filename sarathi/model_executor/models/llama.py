@@ -413,9 +413,8 @@ class LlamaForCausalLM(nn.Module):
             if "rotary_emb.inv_freq" in name:
                 continue
             if pp_model_parallel_rank != 0 and "embed_tokens" in name:
-                if pp_model_parallel_rank == pp_size - 1 and "3.2" in model_name_or_path:
-                    # pp case weight tying embed tokens to lm_head
-                    break
+                _load_lm_head_weights_if_llama3_2(loaded_weight, model_name_or_path, pp_model_parallel_rank, pp_size,
+                                                  state_dict, tensor_model_parallel_rank)
                 continue
 
             if pp_model_parallel_rank != pp_size - 1 and (
@@ -479,12 +478,8 @@ class LlamaForCausalLM(nn.Module):
                 load_padded_tensor_parallel_vocab(
                     param, loaded_weight, tensor_model_parallel_rank
                 )
-                if "3.2" in model_name_or_path and pp_model_parallel_rank == pp_size - 1:
-                    # Llama 3.2 uses weight tying for embed tokens and lm_head
-                    param_lm_head = state_dict["lm_head.weight"]
-                    load_padded_tensor_parallel_vocab(
-                        param_lm_head, loaded_weight, tensor_model_parallel_rank
-                    )
+                _load_lm_head_weights_if_llama3_2(loaded_weight, model_name_or_path, pp_model_parallel_rank, pp_size,
+                                                  state_dict, tensor_model_parallel_rank)
 
                 continue
 
@@ -496,3 +491,13 @@ class LlamaForCausalLM(nn.Module):
                 row_parallel_weights,
                 tensor_model_parallel_rank,
             )
+
+
+def _load_lm_head_weights_if_llama3_2(loaded_weight, model_name_or_path, pp_model_parallel_rank, pp_size,
+                                      state_dict, tensor_model_parallel_rank):
+    if pp_model_parallel_rank == pp_size - 1 and "3.2" in model_name_or_path:
+        # pp case weight tying embed tokens to lm_head
+        param_lm_head = state_dict["lm_head.weight"]
+        load_padded_tensor_parallel_vocab(
+            param_lm_head, loaded_weight, tensor_model_parallel_rank
+        )
