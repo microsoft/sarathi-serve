@@ -477,6 +477,13 @@ class LlamaForCausalLM(nn.Module):
                 load_padded_tensor_parallel_vocab(
                     param, loaded_weight, tensor_model_parallel_rank
                 )
+                if "3.2" in model_name_or_path:
+                    # Llama 3.2 uses weight tying for embed tokens and lm_head
+                    param_lm_head = state_dict["lm_head.weight"]
+                    load_padded_tensor_parallel_vocab(
+                        param_lm_head, loaded_weight, tensor_model_parallel_rank
+                    )
+
                 continue
 
             load_tensor_parallel_weights(
