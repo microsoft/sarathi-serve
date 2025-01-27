@@ -11,6 +11,7 @@ from sarathi.benchmark.config import BenchmarkConfig
 from sarathi.benchmark.entities import Request
 from sarathi.benchmark.request_generator import RequestGeneratorRegistry
 from sarathi.benchmark.utils.random import set_seeds
+from sarathi.benchmark.utils import dataset_loader
 from sarathi.config import ReplicaConfig
 from sarathi.metrics.metrics_store import MetricsStore
 from sarathi.types import ReplicaResourceMapping, ResourceMapping
@@ -38,11 +39,19 @@ class BenchmarkRunner:
         os.makedirs(replica_config.output_dir, exist_ok=True)
 
         set_seeds(self.config.seed)
+        
         request_generator = RequestGeneratorRegistry.get(
             self.config.request_generator_config.get_type(),
             self.config.request_generator_config,
         )
-        self.requests = request_generator.generate()
+
+        if not config.run_correctness_tests:
+            self.requests = request_generator.generate()
+        else:
+            # NOTE: needs to be trace-based with correctness tests
+            self.requests = dataset_loader.get_data_loader(dataset)
+            self.requests[self.replica_id :: self.config.num_replicas]
+            self.correctness_output = {}
 
         # select every nth request for this replica
         # e.g. if there are 4 replicas, and this is the 2nd replica, then
@@ -70,14 +79,24 @@ class BenchmarkRunner:
             temperature=0,
             top_p=1.0,
         )
-        prompt_token_ids = [1] * request.num_prefill_tokens
 
-        return {
-            "prompt": None,
-            "prompt_token_ids": prompt_token_ids,
-            "sampling_params": sampling_params,
-            "arrival_time": first_request_time + request.arrived_at,
-        }
+        if self.config.run_correctness_tests:
+            return {
+                "prompt": request.prompt,
+                "prompt_token_ids": None,
+                "sampling_params": sampling_params,
+                "arrival_time": first_request_time + request.arrived_at,
+            }
+        else:
+
+            prompt_token_ids = [1] * request.num_prefill_tokens
+
+            return {
+                "prompt": None,
+                "prompt_token_ids": prompt_token_ids,
+                "sampling_params": sampling_params,
+                "arrival_time": first_request_time + request.arrived_at,
+            }
 
     def warmup(self) -> None:
         self.llm_engine.add_request(**self._get_input_params(self.requests[0], 0))
@@ -111,6 +130,9 @@ class BenchmarkRunner:
             num_steps += 1
 
             for output in step_outputs:
+                if self.config.run_correctness_tests:
+                    self.correctness_outputs[output.seq_id] = self.correctness_outputs.get(output.seq_id, "") + output.text
+
                 if output.finished:
                     num_processed_requests += 1
                     pbar.update(1)

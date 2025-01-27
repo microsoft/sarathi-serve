@@ -240,6 +240,15 @@ class BenchmarkConfig(BaseEndpointConfig):
     request_generator_config: BaseRequestGeneratorConfig = field(
         default_factory=SyntheticRequestGeneratorConfig
     )
+    run_correctness_tests: bool = field(
+        default=False, metadata={"help": "Collect correctness data in this run"}
+    )
+    correctness_test_dataset: Optional[str] = field(
+        default=None, metadata={"help": "Dataset for correctness tests"}
+    )
+    correctness_test_ground_truth: Optional[str] = field(
+        default=None, metadata={"help": "Ground truth file to compare LLM output with."}
+    )
 
     def __post_init__(self):
         super().__post_init__()
