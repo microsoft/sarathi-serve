@@ -131,7 +131,7 @@ class BenchmarkRunner:
 
             for output in step_outputs:
                 if self.config.run_correctness_tests:
-                    self.correctness_outputs[output.seq_id] = self.correctness_outputs.get(output.seq_id, "") + output.text
+                    self.correctness_output[output.seq_id] = self.correctness_output.get(output.seq_id, "") + output.text
 
                 if output.finished:
                     num_processed_requests += 1
@@ -164,6 +164,17 @@ class BenchmarkRunner:
         self.llm_engine.pull_worker_metrics()
         metric_store = self.llm_engine.get_metric_store()
         return metric_store
+
+        def check_correctness(self) -> bool:
+        assert self.config.run_correctness_checks
+
+        with open(file_path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        for k, v in data.items():
+            if self.correctness_output[k] != v: return False
+        
+        return True
 
 
 class BenchmarkRunnerLauncher:
