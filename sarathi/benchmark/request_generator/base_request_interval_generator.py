@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Union
 
-from sarathi.benchmark.config import BaseRequestLengthGeneratorConfig
+from sarathi.benchmark.config import BaseRequestIntervalGeneratorConfig
 
 
-class BaseRequestLengthGenerator(ABC):
+class BaseRequestIntervalGenerator(ABC):
 
-    def __init__(self, config: BaseRequestLengthGeneratorConfig):
+    def __init__(self, config: BaseRequestIntervalGeneratorConfig):
         self.config = config
 
     @abstractmethod
-    def get_next_num_tokens(self) -> Tuple[Union[str|float], float]:
+    def get_next_inter_request_time(self) -> float:
         pass
