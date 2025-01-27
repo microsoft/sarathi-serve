@@ -162,6 +162,34 @@ class FixedRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
 
 
 @dataclass
+class DatasetRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
+    dataset: str = field(
+        default="ccdv/arxiv-summarization",
+        metadata={"help": "Path to the trace file for request lengths."},
+    )
+    meta_prompt: str = field(
+        default=None,
+        metadata={"help": "Meta prompt for the dataset."},
+    )
+    max_prompt_len: int = field(
+        default=4096, metadata={"help": "Maximum prompt length allowed."}
+    )
+    max_num_prompts: int = field(
+        default=300, metadata={"help": "Maximum number of prompts to use."}
+    )
+    max_decode_tokens: int = field(
+        default=512, metadata={"help": "Maximum number of decode tokens."}
+    )
+    tokenizer_model: str = field(
+        default="meta-llama/Meta-Llama-3-8B-Instruct", metadata={"help": "Name or path of the huggingface model to use for the tokenizer."}
+    )
+
+    @staticmethod
+    def get_type():
+        return RequestLengthGeneratorType.DATASET
+
+
+@dataclass
 class BaseRequestGeneratorConfig(BasePolyConfig):
     seed: int = field(
         default=42, metadata={"help": "Random seed for the request generator."}
@@ -218,6 +246,10 @@ class TraceRequestGeneratorConfig(BaseRequestGeneratorConfig):
 @dataclass
 class BenchmarkConfig(BaseEndpointConfig):
     seed: int = field(default=42, metadata={"help": "Random seed for the benchmark."})
+    benchmark_type: str = field(
+        default="base_engine",
+        metadata={"help": "Type of benchmark to run. Either of base_engine or galadriel_engine"},
+    )
     output_dir: str = field(
         default="benchmark_output",
         metadata={"help": "Directory to store benchmark output."},
