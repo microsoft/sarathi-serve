@@ -1,6 +1,7 @@
 import glob
 import shutil
 import json
+import os
 
 import pandas as pd
 import pytest
@@ -18,7 +19,7 @@ from sarathi.config.config import ModelConfig, ParallelConfig
         ("meta-llama/Meta-Llama-3-8B", 4096, 1, 1, "OpenGVLab/ShareGPT-4o", "uniform"),
     ]
 )
-def perf_test(model: str, max_model_len: int, pp_size: int, tp_size: int, dataset: str, request_pattern: str):
+def test_perf(model: str, max_model_len: int, pp_size: int, tp_size: int, dataset: str, request_pattern: str):
     # TODO: Test over 3d space
     model_config = ModelConfig(
         model=model,
@@ -29,9 +30,11 @@ def perf_test(model: str, max_model_len: int, pp_size: int, tp_size: int, datase
     request_generator_config = SyntheticRequestGeneratorConfig(
         length_generator_config=DatasetRequestLengthGeneratorConfig(dataset=dataset)
     )
+    cwd = os.getcwd()
+    output_dir = os.path.join(cwd, "benchmark_output")
     benchmark_config = BenchmarkConfig(
         log_level="error",
-        # output_dir=output_dir,
+        output_dir=output_dir,
         model_config=model_config,
         parallel_config=parallel_config,
         request_generator_config=request_generator_config
@@ -41,8 +44,7 @@ def perf_test(model: str, max_model_len: int, pp_size: int, tp_size: int, datase
     key = model + "_" + "pp" + str(pp_size) + "_" + "tp" + str(tp_size) + "_" + dataset + "_" + request_pattern
     # TODO: convert to build key for json method
 
-    output_dir = benchmark_config.output_dir
-    perf_json_path = "/perf_test.json"
+    perf_json_path = os.path.join(cwd, "perf_test.json")
     _build_perf_data(key, output_dir, perf_json_path)
 
     # clean up benchmark runner output now
@@ -85,8 +87,7 @@ def _build_perf_data(key: str, output_dir: str, perf_json_path: str):
 
 def _get_result_file(run_dir: str, metric_name: str) -> str:
     result_file = glob.glob(f"{run_dir}/*/*/plots/{metric_name}.csv")
-    if len(result_file) == 0:
-        return
+    assert len(result_file) > 0, f"No benchmark results found for path {run_dir}"
 
     return result_file[0]
 
