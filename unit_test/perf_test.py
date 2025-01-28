@@ -62,16 +62,18 @@ def _build_perf_data(key: str, output_dir: str, perf_json_path: str):
         output_dir, "decode_token_execution_plus_preemption_time"
     )
 
+    # TTFT
     ttft_delay_df = pd.read_csv(ttft_file)
-    ttft_p50 = ttft_delay_df["request_scheduling_delay"].quantile(
+    ttft_p50 = ttft_delay_df["prefill_e2e_time"].quantile(
          p50_quantile
     )
     perf_data["ttft_p50"] = ttft_p50
-    ttft_p90 = ttft_delay_df["request_scheduling_delay"].quantile(
+    ttft_p90 = ttft_delay_df["prefill_e2e_time"].quantile(
         p90_quantile
     )
     perf_data["ttft_p90"] = ttft_p90
 
+    # TBT
     tbt_df = pd.read_csv(tbt_file)
     tbt_p50 = tbt_df["decode_token_execution_plus_preemption_time"].quantile(
         p50_quantile
