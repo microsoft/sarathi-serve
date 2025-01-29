@@ -49,6 +49,7 @@ class BenchmarkRunner:
             self.requests = request_generator.generate()
         else:
             # NOTE: needs to be trace-based with correctness tests
+            print('CORRECTNESS TESTS ENABLED')
             self.requests = dataset_loader.get_data_loader(dataset)
             self.requests[self.replica_id :: self.config.num_replicas]
             self.correctness_output = {}
@@ -131,6 +132,8 @@ class BenchmarkRunner:
 
             for output in step_outputs:
                 if self.config.run_correctness_tests:
+                    print("CORRECTNESS OUTPUT")
+                    print(output.text)
                     self.correctness_output[output.seq_id] = self.correctness_output.get(output.seq_id, "") + output.text
 
                 if output.finished:
@@ -165,7 +168,7 @@ class BenchmarkRunner:
         metric_store = self.llm_engine.get_metric_store()
         return metric_store
 
-        def check_correctness(self) -> bool:
+    def check_correctness(self) -> bool:
         assert self.config.run_correctness_checks
 
         with open(file_path, 'r') as file:
