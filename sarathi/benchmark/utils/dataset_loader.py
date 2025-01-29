@@ -17,7 +17,7 @@ DATASET_FIELDS = {
 }
 
 def get_data_loader(
-    dataset_str: Optional[str], max_samples: Optional[int]
+    dataset_str: Optional[str], max_samples: Optional[int]=None
 ) -> Iterable[str]:
 
     dataset = load_dataset(dataset_str, split='train')
