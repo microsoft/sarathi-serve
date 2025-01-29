@@ -20,7 +20,7 @@ def get_data_loader(
     dataset_str: Optional[str], max_samples: Optional[int]=None
 ) -> Iterable[str]:
 
-    dataset = load_dataset(dataset_str, split='train')
+    dataset = load_dataset(dataset_str, split='test')
     field_name = DATASET_FIELDS[dataset_str]
 
     if "conversation" not in field_name:
