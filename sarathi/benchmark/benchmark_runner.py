@@ -50,7 +50,12 @@ class BenchmarkRunner:
         else:
             # NOTE: needs to be trace-based with correctness tests
             print('CORRECTNESS TESTS ENABLED')
-            self.requests = dataset_loader.get_data_loader(self.config.correctness_test_dataset)
+            self.requests = [Request(
+                arrived_at=0,
+                num_prefill_tokens=len(prompt),
+                num_decode_tokens=1024,
+                prompt=prompt
+            ) for prompt in dataset_loader.get_data_loader(self.config.correctness_test_dataset)]
             # self.requests[self.replica_id :: self.config.num_replicas]
             self.correctness_output = {}
 
