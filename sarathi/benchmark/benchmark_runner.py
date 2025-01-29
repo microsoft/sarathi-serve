@@ -58,7 +58,7 @@ class BenchmarkRunner:
         # e.g. if there are 4 replicas, and this is the 2nd replica, then
         # we will select the 2nd, 6th, 10th, ... requests
         # round robin scheduling
-        self.requests = self.requests[self.replica_id :: self.config.num_replicas]
+        # self.requests = self.requests[self.replica_id :: self.config.num_replicas]
 
         if self.config.num_replicas > 1:
             # disable per-replica wandb logging for multi-replica runs
