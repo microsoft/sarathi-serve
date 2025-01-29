@@ -18,9 +18,9 @@ def main() -> None:
         correctness_test_dataset="openai_humaneval"
     )
 
-    os.makedirs(config.output_dir, exist_ok=True)
-    with open(os.path.join(config.output_dir, "config.yaml"), "w") as f:
-        yaml.dump(config.to_dict(), f)
+    # os.makedirs(config.output_dir, exist_ok=True)
+    # with open(os.path.join(config.output_dir, "config.yaml"), "w") as f:
+    #     yaml.dump(config.to_dict(), f)
 
     logger.info(f"Starting benchmark with config: {config}")
 
