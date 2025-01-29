@@ -51,7 +51,7 @@ class BenchmarkRunner:
             # NOTE: needs to be trace-based with correctness tests
             print('CORRECTNESS TESTS ENABLED')
             self.requests = dataset_loader.get_data_loader(self.config.correctness_test_dataset)
-            self.requests[self.replica_id :: self.config.num_replicas]
+            # self.requests[self.replica_id :: self.config.num_replicas]
             self.correctness_output = {}
 
         # select every nth request for this replica
