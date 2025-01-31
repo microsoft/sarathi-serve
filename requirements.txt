@@ -14,7 +14,7 @@ wandb
 kaleido
 ddsketch
 jupyterlab
-flashinfer >= 0.0.5
+flashinfer == 0.1.5
 pillow
 tiktoken
 grpcio
