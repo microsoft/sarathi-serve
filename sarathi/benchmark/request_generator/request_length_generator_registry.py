@@ -1,3 +1,6 @@
+from sarathi.benchmark.request_generator.dataset_request_length_generator import (
+    DatasetRequestLengthGenerator
+)
 from sarathi.benchmark.request_generator.fixed_request_length_generator import (
     FixedRequestLengthGenerator,
 )
@@ -29,4 +32,7 @@ RequestLengthGeneratorRegistry.register(
 )
 RequestLengthGeneratorRegistry.register(
     RequestLengthGeneratorType.FIXED, FixedRequestLengthGenerator
+)
+RequestLengthGeneratorRegistry.register(
+    RequestLengthGeneratorType.DATASET, DatasetRequestLengthGenerator
 )
