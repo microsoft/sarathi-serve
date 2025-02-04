@@ -45,14 +45,10 @@ class BenchmarkRunner:
             self.config.request_generator_config,
         )
 
-        if not config.run_correctness_tests:
-            self.requests = request_generator.generate()
-        else:
-            # NOTE: needs to be trace-based with correctness tests
-            print('CORRECTNESS TESTS ENABLED')
-            self.requests = dataset_loader.get_data_loader(self.config.correctness_test_dataset)
-            # self.requests[self.replica_id :: self.config.num_replicas]
-            self.correctness_output = {}
+        self.requests = request_generator.generate()
+
+        self.run_correctness_tests = self.config.correctness_test_config is not None \
+            and self.config.correctness_test_config.run_correctness_tests
 
         # select every nth request for this replica
         # e.g. if there are 4 replicas, and this is the 2nd replica, then
@@ -81,7 +77,7 @@ class BenchmarkRunner:
             top_p=1.0,
         )
 
-        if self.config.run_correctness_tests:
+        if self.run_correctness_tests:
             return {
                 "prompt": request.prompt,
                 "prompt_token_ids": None,
