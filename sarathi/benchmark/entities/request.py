@@ -30,6 +30,10 @@ class Request(BaseEntity):
     @property
     def arrived_at(self) -> float:
         return self._arrived_at
+    
+    @property
+    def prompt(self) -> float:
+        return self._prompt
 
     @property
     def num_prefill_tokens(self) -> int:
@@ -51,7 +55,7 @@ class Request(BaseEntity):
     def prompt(self) -> int:
         return self._prompt
     
-    
+
 
     def to_dict(self) -> dict:
         return {
