@@ -46,8 +46,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.append_kv_page_indices_tensor = None
         self.append_kv_page_indptr_tensor = None
         self.append_kv_last_page_len_tensor = None
-        self.append_batch_indices_tensor = None  # newly increased
-        self.append_positions_tensor = None      # newly increased
 
     def to_int_tensor(self, data: List[int]) -> torch.Tensor:
         return torch.tensor(data, dtype=torch.int32, device="cuda")
@@ -66,19 +64,30 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self,
         seq_metadata_list: List[SequenceMetadata],
     ) -> None:
+        # The indptr tensor captures the location query tokens in the input tensor.
+        # |<---------------------- num_valid_tokens ----------------------------------------------------->|
+        # |<--------------- num_prompt_tokens -------------->||<------- num_generation_tokens (M) ------->|
+        # |<--prompt_0-->|<--prompt_1-->|...|<--prompt_N-1-->||<--generation_0-->|...|<--generation_M-1-->|<--padding-->|
+        #
+        # Flashinfer calls this layout as a raggedtensor. The indptr tensor captures the start of each
+        # sequence in the ragged tensor. The length of the indptr tensor is the number of sequences + 1.
+        # We perform both prefill and decode attention in a single call to batched prefill kernel.
+        # prefill_qo_indptr: [0, prompt_0, prompt_0 + prompt_1, ..., prompt_0 + ... + prompt_N-1, generation_0, generation_0 + 1, ..., generation_0 + ... + M]
         prefill_qo_indptr: List[int] = [0]
         decode_qo_indptr: List[int] = [0]
+        # The kv_page_indices tensor captures the pages of the key-value cache that
+        # are assigned to each token in the input tensor. Since there is a variable number
+        # of pages assigned to each sequence, a ragged tensor to represent this.
         prefill_kv_page_indices: List[int] = []
         decode_kv_page_indices: List[int] = []
+        # the last page might not be full, so we need to keep track of the length of the last page
         prefill_kv_last_page_len: List[int] = []
         decode_kv_last_page_len: List[int] = []
+        # Since the prefill_kv_page_indices tensor is a ragged tensor, we also need to keep track of the
+        # indptr tensor for the prefill_kv_page_indices tensor. This tensor captures the start of each sequence
+        # in the ragged tensor.
         prefill_kv_page_indptr: List[int] = [0]
         decode_kv_page_indptr: List[int] = [0]
-        # newly increase batch_indices and positions
-        prefill_batch_indices: List[int] = []
-        decode_batch_indices: List[int] = []
-        prefill_positions: List[int] = []
-        decode_positions: List[int] = []
 
         self.is_profiling_iteration = False
         self.is_metadata_initialized = True
@@ -86,12 +95,15 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.contains_prefill = False
         self.contains_decode = False
 
-        for seq_idx, seq_metadata in enumerate(seq_metadata_list):
+        for seq_metadata in seq_metadata_list:
             if not seq_metadata.is_prompt:
                 continue
 
+            # ONLY used for profiling
             if seq_metadata.block_table is None:
                 self.is_profiling_iteration = True
+                # During memory profiling, the block tables are not initialized yet.
+                #  We will just skip the attention computation for now.
                 return
 
             self.contains_prefill = True
@@ -100,18 +112,21 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             processed_prompt_len = seq_metadata.seq.get_num_prompt_tokens_processed()
             current_total_len = processed_prompt_len + prompt_chunk_len
 
+            # indptr for the prompt tokens in q/o tensor
             prefill_qo_indptr.append(prefill_qo_indptr[-1] + prompt_chunk_len)
-            num_blocks_in_use = (current_total_len + self.block_size - 1) // self.block_size
+            # Compute the kv page indices for the prompt tokens.
+            num_blocks_in_use = (
+                current_total_len + self.block_size - 1
+            ) // self.block_size
             prefill_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
-            prefill_kv_page_indptr.append(prefill_kv_page_indptr[-1] + num_blocks_in_use)
+            prefill_kv_page_indptr.append(
+                prefill_kv_page_indptr[-1] + num_blocks_in_use
+            )
             prefill_kv_last_page_len.append(
                 current_total_len % self.block_size or self.block_size
             )
-            # computing batch_indices and positions
-            prefill_batch_indices.extend([seq_idx] * prompt_chunk_len)
-            prefill_positions.extend(range(processed_prompt_len, current_total_len))
 
-        for seq_idx, seq_metadata in enumerate(seq_metadata_list):
+        for seq_metadata in seq_metadata_list:
             if seq_metadata.is_prompt:
                 continue
 
@@ -122,16 +137,15 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.contains_decode = True
 
             context_len = seq_metadata.seq.get_len()
+            # indptr for the prompt tokens in q/o tensor
             decode_qo_indptr.append(decode_qo_indptr[-1] + 1)
+            # Compute the kv page indices for the prompt tokens.
             num_blocks_in_use = (context_len + self.block_size - 1) // self.block_size
             decode_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
             decode_kv_page_indptr.append(decode_kv_page_indptr[-1] + num_blocks_in_use)
             decode_kv_last_page_len.append(
                 context_len % self.block_size or self.block_size
             )
-            # computing batch_indices and positions
-            decode_batch_indices.append(seq_idx)
-            decode_positions.append(context_len - 1)  # Only the latest token is appended when decoding
 
         if self.contains_prefill:
             self.prefill_wrapper.begin_forward(
@@ -161,22 +175,18 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.num_total_tokens = self.num_prefill_tokens + len(decode_qo_indptr) - 1
 
         self.append_qo_indptr_tensor = self.to_int_tensor(
-            prefill_qo_indptr[:-1] + [x + prefill_qo_indptr[-1] for x in decode_qo_indptr]
+            prefill_qo_indptr[:-1]
+            + [x + prefill_qo_indptr[-1] for x in decode_qo_indptr]
         )
         self.append_kv_page_indices_tensor = self.to_int_tensor(
             prefill_kv_page_indices + decode_kv_page_indices
         )
         self.append_kv_page_indptr_tensor = self.to_int_tensor(
-            prefill_kv_page_indptr[:-1] + [x + prefill_kv_page_indptr[-1] for x in decode_kv_page_indptr]
+            prefill_kv_page_indptr[:-1]
+            + [x + prefill_kv_page_indptr[-1] for x in decode_kv_page_indptr]
         )
         self.append_kv_last_page_len_tensor = self.to_int_tensor(
             prefill_kv_last_page_len + decode_kv_last_page_len
-        )
-        self.append_batch_indices_tensor = self.to_int_tensor(
-            prefill_batch_indices + decode_batch_indices
-        )
-        self.append_positions_tensor = self.to_int_tensor(
-            prefill_positions + decode_positions
         )
 
     def end_forward(self):
@@ -200,6 +210,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         assert self.is_metadata_initialized, "Metadata is not initialized."
 
         if self.is_profiling_iteration:
+            # there is no need to call attention in profiling mode
             return torch.zeros_like(query)
 
         with self.get_timer(OperationMetrics.ATTN_INPUT_RESHAPE, layer_id):
@@ -213,8 +224,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             append_paged_kv_cache(
                 key,
                 value,
-                self.append_batch_indices_tensor,  # change to batch_indices
-                self.append_positions_tensor,      # change to positions
+                self.append_qo_indptr_tensor,
                 kv_cache,
                 self.append_kv_page_indices_tensor,
                 self.append_kv_page_indptr_tensor,
