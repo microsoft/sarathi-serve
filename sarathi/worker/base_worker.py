@@ -13,6 +13,11 @@ from sarathi.config import CacheConfig, ParallelConfig, SystemConfig
 from sarathi.core.datatypes.comm_info import CommInfo
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs
+from sarathi.core.proto_utils import (
+    deserialize_sampler_outputs,
+    deserialize_step_inputs,
+    serialize_sampler_outputs,
+)
 from sarathi.core.sequence_manager.worker_sequence_manager import WorkerSequenceManager
 from sarathi.logger import init_logger
 from sarathi.metrics.metrics_store import MetricsStore
@@ -204,17 +209,22 @@ class BaseWorker:
         self.worker_ready_event.set()
 
         while True:
-            step_inputs = self.enqueue_socket.recv_pyobj()
+            # Receive protobuf-serialized data
+            data = self.enqueue_socket.recv()
+            step_inputs = deserialize_step_inputs(data)
 
-            for new_seq in step_inputs.new_seqs:
-                self.seq_manager.add_seq(new_seq)
+            if step_inputs.new_seqs:
+                for new_seq in step_inputs.new_seqs:
+                    self.seq_manager.add_seq(new_seq)
 
             output = self.execute_model(step_inputs.scheduler_outputs)
 
             if not self.is_tensor_parallel_rank_zero:
                 continue
 
-            self.output_socket.send_pyobj(output)
+            # Send protobuf-serialized output
+            serialized_output = serialize_sampler_outputs(output)
+            self.output_socket.send(serialized_output)
 
     @synchronized
     def get_metrics_store(self) -> MetricsStore:

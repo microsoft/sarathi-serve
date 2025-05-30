@@ -18,6 +18,8 @@ flashinfer == 0.1.5
 pillow
 tiktoken
 grpcio
+grpcio-tools  # For protobuf compilation
+protobuf>=4.21.0  # For protobuf serialization
 uvicorn
 fastapi
 openai
