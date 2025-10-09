@@ -32,7 +32,7 @@ mamba create -p ./env python=3.10
 ### Install Sarathi-Serve
 
 ```sh
-pip install -e . --extra-index-url https://flashinfer.ai/whl/cu121/torch2.3/
+pip install -e .
 ```
 
 ## Reproducing Results
