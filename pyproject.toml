@@ -3,7 +3,7 @@ requires = [
     "ninja",
     "packaging",
     "setuptools",
-    "torch == 2.3",
+    "torch",
     "wheel",
 ]
 build-backend = "setuptools.build_meta"
