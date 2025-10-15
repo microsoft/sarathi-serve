@@ -26,13 +26,13 @@ bash Mambaforge-Linux-x86_64.sh # follow the instructions from there
 Create a Python 3.10 environment,
 
 ```sh
-mamba create -p ./env python=3.10  
+mamba create -p ./env python=3.11  
 ```
 
 ### Install Sarathi-Serve
 
 ```sh
-pip install -e . --extra-index-url https://flashinfer.ai/whl/cu121/torch2.3/
+pip install -e .
 ```
 
 ## Reproducing Results
