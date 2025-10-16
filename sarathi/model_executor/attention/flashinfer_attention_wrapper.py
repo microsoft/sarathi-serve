@@ -67,8 +67,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.gpu_cache = gpu_cache
 
     def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
-        # Initialize with zeros instead of random values
-        # Random values can cause garbage output if uninitialized regions are read
+        # Initialize cache blocks with zeros
         return torch.zeros(
             num_blocks,
             2,
@@ -162,8 +161,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             # indptr for the decode tokens in q/o tensor (1 token per sequence)
             decode_qo_indptr.append(decode_qo_indptr[-1] + 1)
 
-            # Use AFTER state for both attention and append
-            # FlashInfer's get_batch_indices_positions expects AFTER state
+            # Compute KV cache blocks needed for sequence length after token append
             num_blocks_after = (total_len_after_append + self.block_size - 1) // self.block_size
             decode_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_after])
             decode_kv_page_indptr.append(decode_kv_page_indptr[-1] + num_blocks_after)
@@ -181,7 +179,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 self.num_kv_heads,
                 self.head_dim,
                 self.block_size,
-                causal=True,  # Apply causal masking for autoregressive generation
+                causal=True,
             )
 
         if self.contains_decode:
@@ -215,25 +213,20 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             prefill_kv_last_page_len + decode_kv_last_page_len
         )
 
-        # Build batch_indices and positions tensors for flashinfer API
-        # According to the documentation example, we should use get_seq_lens to compute
-        # the sequence lengths from the KV cache metadata, NOT from seq_metadata directly
-        # This ensures consistency with how FlashInfer expects the data
+        # Compute sequence lengths from KV cache metadata
         seq_lens_from_cache = get_seq_lens(
             self.append_kv_page_indptr_tensor,
             self.append_kv_last_page_len_tensor,
             self.block_size,
         )
 
-        # Generate batch_indices and positions for the UNPADDED tokens
+        # Generate batch_indices and positions for append operation
         batch_indices_unpadded, positions_unpadded = get_batch_indices_positions(
             self.append_qo_indptr_tensor,
             seq_lens_from_cache,
             self.num_total_tokens,
         )
 
-        # Store unpadded batch_indices and positions
-        # We'll handle padding in the forward method by only passing unpadded tensors
         self.append_batch_indices_tensor = batch_indices_unpadded
         self.append_positions_tensor = positions_unpadded
 
@@ -286,7 +279,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 output[: self.num_prefill_tokens] = self.prefill_wrapper.forward(
                     query[: self.num_prefill_tokens],
                     self.gpu_cache[layer_cache_idx],
-                    causal=True,  # Required: v0.4.1 changed default from True to False
+                    causal=True,
                     pos_encoding_mode="NONE",
                     sm_scale=softmax_scale,
                 )

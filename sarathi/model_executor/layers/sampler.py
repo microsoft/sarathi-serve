@@ -152,16 +152,12 @@ def _get_top_p_top_k(
 def _top_k_top_p_with_flashinfer(
     logits: torch.Tensor, top_ks: torch.Tensor, top_ps: torch.Tensor
 ) -> torch.Tensor:
-    # FlashInfer v0.4.1 API: no longer needs uniform_samples, uses internal generator
-    # The function signature is: top_k_top_p_sampling_from_logits(logits, top_k, top_p, ...)
     batch_next_token_ids = flashinfer_top_k_top_p_sampling_from_logits(
         logits, top_ks, top_ps
     )
-
     return batch_next_token_ids.view(-1)
 
 
 def _sample_with_flashinfer(probs: torch.Tensor) -> torch.Tensor:
-    # FlashInfer v0.4.1 API: no longer needs uniform_samples parameter
     samples = flashinfer_sampling_from_probs(probs)
     return samples

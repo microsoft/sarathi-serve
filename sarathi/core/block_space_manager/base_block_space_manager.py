@@ -96,21 +96,16 @@ class BaseBlockSpaceManager(ABC):
         return num_free_gpu_blocks > 0
 
     def append_slot(self, seq: Sequence) -> None:
-        """Allocate a physical slot for a new token.
-
-        This method is called BEFORE the token is actually appended to the sequence.
-        We need to allocate blocks for the state AFTER the token will be appended,
-        to ensure FlashInfer has the correct block table when it writes to the cache.
-        """
+        """Allocate a physical slot for a new token."""
         logical_blocks = seq.logical_token_blocks
         block_table = self.block_tables[seq.seq_id]
 
-        # Calculate how many blocks we'll need AFTER appending the next token
+        # Calculate blocks needed for sequence length after appending the next token
         current_num_tokens = seq.get_len()
         num_tokens_after_append = current_num_tokens + 1
         num_blocks_needed_after = (num_tokens_after_append + self.block_size - 1) // self.block_size
 
-        # Allocate blocks until we have enough for the AFTER state
+        # Allocate additional blocks if needed
         while len(block_table) < num_blocks_needed_after:
             block = self.gpu_allocator.allocate()
             block_table.append(block)
