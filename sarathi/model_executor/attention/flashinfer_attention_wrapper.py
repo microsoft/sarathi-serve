@@ -67,8 +67,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.gpu_cache = gpu_cache
 
     def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
-        # Initialize cache blocks with zeros
-        return torch.zeros(
+        return torch.randn(
             num_blocks,
             2,
             self.block_size,
@@ -156,17 +155,16 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.contains_decode = True
 
             context_len = seq_metadata.seq.get_len()
-            total_len_after_append = context_len + 1
 
             # indptr for the decode tokens in q/o tensor (1 token per sequence)
             decode_qo_indptr.append(decode_qo_indptr[-1] + 1)
 
-            # Compute KV cache blocks needed for sequence length after token append
-            num_blocks_after = (total_len_after_append + self.block_size - 1) // self.block_size
-            decode_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_after])
-            decode_kv_page_indptr.append(decode_kv_page_indptr[-1] + num_blocks_after)
+            # Compute the kv page indices for the decode tokens
+            num_blocks_in_use = (context_len + self.block_size - 1) // self.block_size
+            decode_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
+            decode_kv_page_indptr.append(decode_kv_page_indptr[-1] + num_blocks_in_use)
             decode_kv_last_page_len.append(
-                total_len_after_append % self.block_size or self.block_size
+                context_len % self.block_size or self.block_size
             )
 
         if self.contains_prefill:

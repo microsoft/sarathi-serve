@@ -100,13 +100,9 @@ class BaseBlockSpaceManager(ABC):
         logical_blocks = seq.logical_token_blocks
         block_table = self.block_tables[seq.seq_id]
 
-        # Calculate blocks needed for sequence length after appending the next token
-        current_num_tokens = seq.get_len()
-        num_tokens_after_append = current_num_tokens + 1
-        num_blocks_needed_after = (num_tokens_after_append + self.block_size - 1) // self.block_size
-
-        # Allocate additional blocks if needed
-        while len(block_table) < num_blocks_needed_after:
+        if len(block_table) < len(logical_blocks):
+            # The sequence has a new logical block.
+            # Allocate a new physical block.
             block = self.gpu_allocator.allocate()
             block_table.append(block)
 
