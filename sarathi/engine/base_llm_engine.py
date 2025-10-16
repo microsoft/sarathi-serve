@@ -13,6 +13,10 @@ from sarathi.core.datatypes.sampling_params import SamplingParams
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs, Sequence, SequenceMetadata
 from sarathi.core.datatypes.step_inputs import StepInputs
+from sarathi.core.proto_utils import (
+    deserialize_sampler_outputs,
+    serialize_step_inputs,
+)
 from sarathi.core.scheduler.scheduler_registry import SchedulerRegistry
 from sarathi.core.sequence_manager.engine_sequence_manager import EngineSequenceManager
 from sarathi.engine.ray_utils import RayWorker, initialize_cluster, ray
@@ -381,13 +385,17 @@ class BaseLLMEngine:
             scheduler_outputs
         )
 
-        self.enqueue_socket.send_pyobj(
-            StepInputs(
-                scheduler_outputs,
-                new_seqs=self._get_new_seqs(),
-            )
+        # Serialize and send step inputs
+        step_inputs = StepInputs(
+            scheduler_outputs,
+            new_seqs=self._get_new_seqs(),
         )
-        sampler_outputs = self.output_socket.recv_pyobj()
+        serialized_inputs = serialize_step_inputs(step_inputs)
+        self.enqueue_socket.send(serialized_inputs)
+        
+        # Receive and deserialize sampler outputs
+        data = self.output_socket.recv()
+        sampler_outputs = deserialize_sampler_outputs(data)
 
         return self._on_step_completed(
             scheduler_outputs,
