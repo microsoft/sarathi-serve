@@ -152,25 +152,12 @@ def _get_top_p_top_k(
 def _top_k_top_p_with_flashinfer(
     logits: torch.Tensor, top_ks: torch.Tensor, top_ps: torch.Tensor
 ) -> torch.Tensor:
-    batch_size = logits.shape[0]
-    uniform_samples = torch.empty((_MAX_TOP_K_ROUND, batch_size), device=logits.device)
-    uniform_samples.uniform_()
-
-    (batch_next_token_ids, success) = flashinfer_top_k_top_p_sampling_from_logits(
-        logits, uniform_samples, top_ks, top_ps
+    batch_next_token_ids = flashinfer_top_k_top_p_sampling_from_logits(
+        logits, top_ks, top_ps
     )
-
-    if not success.all():
-        probs = torch.softmax(logits, dim=-1, dtype=torch.float)
-        probs = flashinfer.sampling.top_k_renorm_prob(probs, top_ks)
-        probs = flashinfer.sampling.top_p_renorm_prob(probs, top_ps)
-        batch_next_token_ids = flashinfer_sampling_from_probs(probs, uniform_samples[0])
-
     return batch_next_token_ids.view(-1)
 
 
 def _sample_with_flashinfer(probs: torch.Tensor) -> torch.Tensor:
-    batch_size = probs.shape[0]
-    uniform_samples = torch.rand(batch_size).to(probs.device)
-    samples = flashinfer_sampling_from_probs(probs, uniform_samples)
+    samples = flashinfer_sampling_from_probs(probs)
     return samples

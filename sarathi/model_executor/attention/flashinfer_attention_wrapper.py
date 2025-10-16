@@ -1,7 +1,12 @@
 from typing import List, Optional, Tuple, Union
 
 import torch
-from flashinfer import BatchPrefillWithPagedKVCacheWrapper, append_paged_kv_cache
+from flashinfer import (
+    BatchPrefillWithPagedKVCacheWrapper,
+    append_paged_kv_cache,
+    get_batch_indices_positions,
+    get_seq_lens,
+)
 
 from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
@@ -150,9 +155,11 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.contains_decode = True
 
             context_len = seq_metadata.seq.get_len()
-            # indptr for the prompt tokens in q/o tensor
+
+            # indptr for the decode tokens in q/o tensor (1 token per sequence)
             decode_qo_indptr.append(decode_qo_indptr[-1] + 1)
-            # Compute the kv page indices for the prompt tokens.
+
+            # Compute the kv page indices for the decode tokens
             num_blocks_in_use = (context_len + self.block_size - 1) // self.block_size
             decode_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
             decode_kv_page_indptr.append(decode_kv_page_indptr[-1] + num_blocks_in_use)
@@ -170,6 +177,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 self.num_kv_heads,
                 self.head_dim,
                 self.block_size,
+                causal=True,
             )
 
         if self.contains_decode:
@@ -185,7 +193,8 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             )
 
         self.num_prefill_tokens = prefill_qo_indptr[-1]
-        self.num_total_tokens = self.num_prefill_tokens + len(decode_qo_indptr) - 1
+        num_decode_tokens = len(decode_qo_indptr) - 1
+        self.num_total_tokens = self.num_prefill_tokens + num_decode_tokens
 
         self.append_qo_indptr_tensor = self.to_int_tensor(
             prefill_qo_indptr[:-1]
@@ -201,6 +210,23 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         self.append_kv_last_page_len_tensor = self.to_int_tensor(
             prefill_kv_last_page_len + decode_kv_last_page_len
         )
+
+        # Compute sequence lengths from KV cache metadata
+        seq_lens_from_cache = get_seq_lens(
+            self.append_kv_page_indptr_tensor,
+            self.append_kv_last_page_len_tensor,
+            self.block_size,
+        )
+
+        # Generate batch_indices and positions for append operation
+        batch_indices_unpadded, positions_unpadded = get_batch_indices_positions(
+            self.append_qo_indptr_tensor,
+            seq_lens_from_cache,
+            self.num_total_tokens,
+        )
+
+        self.append_batch_indices_tensor = batch_indices_unpadded
+        self.append_positions_tensor = positions_unpadded
 
     def end_forward(self):
         if self.contains_prefill:
@@ -235,9 +261,10 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
 
         with self.get_timer(OperationMetrics.ATTN_KV_CACHE_SAVE, layer_id):
             append_paged_kv_cache(
-                key,
-                value,
-                self.append_qo_indptr_tensor,
+                key[: self.num_total_tokens],
+                value[: self.num_total_tokens],
+                self.append_batch_indices_tensor,
+                self.append_positions_tensor,
                 self.gpu_cache[layer_cache_idx],
                 self.append_kv_page_indices_tensor,
                 self.append_kv_page_indptr_tensor,
@@ -250,6 +277,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 output[: self.num_prefill_tokens] = self.prefill_wrapper.forward(
                     query[: self.num_prefill_tokens],
                     self.gpu_cache[layer_cache_idx],
+                    causal=True,
                     pos_encoding_mode="NONE",
                     sm_scale=softmax_scale,
                 )

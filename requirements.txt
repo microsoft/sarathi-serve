@@ -5,6 +5,7 @@ pandas  # Required for Ray data.
 pyarrow  # Required for Ray data.
 sentencepiece  # Required for LLaMA tokenizer.
 numpy
+torch==2.9.0
 torch
 transformers >= 4.37.0  # Required for Mistral.
 matplotlib
@@ -14,6 +15,7 @@ wandb
 kaleido
 ddsketch
 jupyterlab
+flashinfer-python==0.4.1
 flashinfer-python
 pillow
 tiktoken
