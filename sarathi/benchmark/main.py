@@ -13,11 +13,14 @@ logger = init_logger(__name__)
 
 
 def main() -> None:
-    config = BenchmarkConfig.create_from_cli_args()
+    config = BenchmarkConfig(
+        run_correctness_tests=True,
+        correctness_test_dataset="openai_humaneval"
+    )
 
-    os.makedirs(config.output_dir, exist_ok=True)
-    with open(os.path.join(config.output_dir, "config.yaml"), "w") as f:
-        yaml.dump(config.to_dict(), f)
+    # os.makedirs(config.output_dir, exist_ok=True)
+    # with open(os.path.join(config.output_dir, "config.yaml"), "w") as f:
+    #     yaml.dump(config.to_dict(), f)
 
     logger.info(f"Starting benchmark with config: {config}")
 

@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
 
 from sarathi.benchmark.entities.base_entity import BaseEntity
 
@@ -13,11 +13,13 @@ class Request(BaseEntity):
         arrived_at: float,
         num_prefill_tokens: int,
         num_decode_tokens: int,
+        prompt: Optional[str]
     ):
         self._id = Request.generate_id()
         self._arrived_at = arrived_at
         self._num_prefill_tokens = num_prefill_tokens
         self._num_decode_tokens = num_decode_tokens
+        self._prompt = prompt
         assert num_prefill_tokens > 0
         assert num_decode_tokens > 0
 
@@ -28,6 +30,10 @@ class Request(BaseEntity):
     @property
     def arrived_at(self) -> float:
         return self._arrived_at
+    
+    @property
+    def prompt(self) -> float:
+        return self._prompt
 
     @property
     def num_prefill_tokens(self) -> int:
@@ -44,6 +50,12 @@ class Request(BaseEntity):
     @property
     def total_tokens(self) -> int:
         return self._num_prefill_tokens + self._num_decode_tokens
+    
+    @property
+    def prompt(self) -> int:
+        return self._prompt
+    
+
 
     def to_dict(self) -> dict:
         return {
