@@ -2,12 +2,13 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
 
-
+# ABC是抽象基类
 class BaseRegistry(ABC):
     _key_class = Enum
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
+        # 使用了 __init_subclass__，保证了每一个子类（如 SchedulerRegistry）都有自己独立的一个空字典 _registry，互不干扰。
         cls._registry = {}
 
     @classmethod

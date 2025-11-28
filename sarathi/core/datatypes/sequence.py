@@ -235,6 +235,7 @@ class SequenceScheduleMetadata:
         self.seq_id = seq_id
         self.prompt_chunk_len = prompt_chunk_len
 
+    # @property装饰器 - 把类的一个方法伪装成同名“数据属性”，调用时不需要加括号，同时还能在赋值、删除时自动触发额外逻辑。
     @property
     def num_prompt_tokens(self) -> int:
         return self.prompt_chunk_len

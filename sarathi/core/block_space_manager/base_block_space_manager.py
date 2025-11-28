@@ -121,6 +121,11 @@ class BaseBlockSpaceManager(ABC):
         block_table = self.block_tables[seq.seq_id]
         self._free_block_table(block_table)
         del self.block_tables[seq.seq_id]
+        ###############
+        # 逻辑层面的释放
+        # 这里的“释放”并不是指调用 cudaFree 真的把显存还给操作系统，
+        # 而是指将这些 Slot ID 标记为“可用”，放回空闲池（Allocator）中，供后续请求覆盖使用。
+        ###############
 
     def reset(self) -> None:
         for block_table in self.block_tables.values():

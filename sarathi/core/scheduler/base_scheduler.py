@@ -113,6 +113,7 @@ class BaseScheduler(ABC):
         assert seq.is_executing()
         self.block_manager.append_slot(seq)
 
+    # 强制停止一个正在 GPU 上运行的请求，剥夺它的显存资源，并将其放回等待队列的“头等舱”（最前面），以便下次优先执行
     def _preempt(
         self,
         seq: Sequence,

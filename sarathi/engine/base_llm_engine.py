@@ -97,6 +97,7 @@ class BaseLLMEngine:
         self.mark_initial_memory_profiling_done()
 
         # Create the scheduler.
+        # 创建调度器
         self.scheduler = SchedulerRegistry.get(
             config.scheduler_config.get_type(),
             config.model_config,

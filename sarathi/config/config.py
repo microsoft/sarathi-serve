@@ -177,7 +177,9 @@ class ParallelConfig:
 @dataclass
 class BaseSchedulerConfig(BasePolyConfig):
     max_num_seqs: int = field(
+        # 默认值为128
         default=128,
+        # metadata用于存储字段的附加信息，这里用于帮助信息
         metadata={
             "help": "Maximum number of sequences to be processed in a single iteration (batch size)."
         },
@@ -243,6 +245,7 @@ class FasterTransformerSchedulerConfig(BaseSchedulerConfig):
 
 @dataclass
 class SarathiSchedulerConfig(BaseSchedulerConfig):
+    # 默认chunk_size为512
     chunk_size: int = field(
         default=512, metadata={"help": "Size of each chunk for Sarathi scheduler."}
     )
