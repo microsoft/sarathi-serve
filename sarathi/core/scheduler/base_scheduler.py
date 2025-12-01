@@ -30,6 +30,7 @@ class BaseScheduler(ABC):
         self.parallel_config = parallel_config
 
         # we maintain this just for logging purposes
+        # 保留它只是为了记录日志
         self._iteration_id = -1
 
         # Instantiate the scheduling policy.
@@ -49,7 +50,11 @@ class BaseScheduler(ABC):
         # TODO(zhuohan): Use deque instead of list for better performance.
         # Sequence groups in the WAITING state.
         self.waiting: List[Sequence] = []
+
         # Sequence groups in the RUNNING state.
+        # 上一轮迭代结束时，还在 GPU 上运行的那些请求
+        # 它的生命周期贯穿整个系统的运行过程
+        # 它只在系统启动（__init__）时被初始化为空列表一次；之后，它就一直保存着系统的“状态”
         self.running: List[Sequence] = []
 
     def reset_state(self) -> None:

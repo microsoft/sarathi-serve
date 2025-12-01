@@ -26,7 +26,7 @@ bash Mambaforge-Linux-x86_64.sh # follow the instructions from there
 Create a Python 3.10 environment,
 
 ```sh
-mamba create -p ./env python=3.11  
+mamba create -p ./env python=3.10 
 ```
 
 ### Install Sarathi-Serve

@@ -215,15 +215,18 @@ class SarathiScheduler(BaseScheduler):
             # seq 是一个正在 Decode 阶段的请求（例如它已经生成了 10 个词，现在要生成第 11 个）
             seq = self.running.pop(0)
 
+            # 如果请求被暂停，暂不处理
             if not seq.is_paused():
                 running.append(seq)
                 continue
 
+            # 如果是 Prefill 还没跑完的任务，先存起来，稍后处理
             if not seq.prompt_stage_processing_finished:
                 running_prefills.append(seq)
                 continue
 
-            # 只要 Block Manager 说“没空位”，就一直循环尝试腾空间
+            # [关键逻辑] 显存不足时的抢占机制 (Preemption)
+            # 这是一个 "死循环"，直到腾出空间或自我牺牲
             while not self.block_manager.can_append_slot():
                 if self.running:
                     # Preempt the lowest-priority sequence groups.
@@ -257,7 +260,9 @@ class SarathiScheduler(BaseScheduler):
                 # 3. 扣除 1 个 Token 的预算（Decode 消耗 1 个）
                 num_batched_tokens += 1
                 # 4. 记录元数据，告诉底层引擎这个 seq 要执行解码
+                # TODO：具体怎么实现的还需要看 sequence.py
                 scheduled_seq_metadata_list.append(
+                    # SequenceScheduleMetadata.form_sequence 是一个类方法，使用seq 和 解码长度返回一个SequenceScheduleMetadata类实例
                     SequenceScheduleMetadata.from_sequence(seq)
                 )
 
@@ -267,13 +272,19 @@ class SarathiScheduler(BaseScheduler):
         # 现在加入尚未完成预填充的请求
         # 这些预填充所需的内存早已分配完毕
         # 因此我们应该能够一次性全部运行它们
+        # Phase 1.2 处理那些“上次没跑完，这次得接着跑”的 Prefill 任务（即 Chunked Prefill 的后续部分）。
+        # 对应论文 `if not is_prefill_complete(R)`
         for seq in running_prefills:
+            # 断言：确保这里面装的确实是还没跑完 Prefill 的任务
             assert not seq.prompt_stage_processing_finished
 
+            # 对应算法三的 get_next_chunk_size
+            # 求 min(剩余Prompt, chunk_size - 当前已用的Budget)
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
                 seq, num_batched_tokens
             )
 
+            # TODO：不知道这里什么意思，还需要理解
             # as long as the request could fit in the batch previously
             # it should be able to fit in the batch now
             # so in non-pipeline case this condition should always be false
@@ -286,7 +297,9 @@ class SarathiScheduler(BaseScheduler):
                 running.append(seq)
                 continue
 
+            # 对应算法三中的 `n_t = n_t + c`
             num_batched_tokens += next_num_prefill_tokens
+            # 记录元数据，告诉底层引擎这个 seq 要执行解码
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
                     seq, prompt_chunk_len=next_num_prefill_tokens
@@ -295,55 +308,73 @@ class SarathiScheduler(BaseScheduler):
             running.append(seq)
 
         ######################################################################
-        # Phase 2: Add waiting (new) sequence groups to the batch.
-        # This routine is nearly-identical to the one in sarathi scheduler
+        # Phase 2: 处理等待队列中的新请求 (New Requests)
+        # 目标：Piggybacking (捎带执行)，实现 Stall-free Batching
         ######################################################################
         # Optimization: We do not sort the waiting queue since the preempted
         # sequence groups are added to the front and the new sequence groups
         # are added to the back.
+        # 只要还有 Budget (num_batched_tokens < chunk_size)，就尝试加入新请求
         while self.waiting:
             seq = self.waiting[0]
 
             # This is required to handle benchmarking where we set request arrival time ahead of time
+            # 处理 Benchmarking 的特殊情况（模拟请求到达时间）
             if seq.arrival_time > now:
                 break
 
+            # 检查 Prompt 是否超过模型最大支持长度
             if not self._check_request_prompt_length(seq):
                 ignored_seq_ids.append(seq.seq_id)
                 continue
 
             # If the sequence group cannot be allocated, stop.
+            # [Memory Check] 检查是否有足够显存启动该请求
+            # 注意：如果显存不够，这里不会抢占，而是直接不调度该新请求（流控）
             if not self.block_manager.can_allocate(seq):
                 # this is different from vllm scheduler
                 # even if we cannot allocate this sequence group
                 # there might be other sequence groups that can be allocated
                 break
 
+            # 检查最大并发序列数限制
             # The total number of sequences in the RUNNING state should not
             # exceed the maximum number of sequences.
             if len(running) >= self.scheduler_config.max_num_seqs:
                 break
 
+            # 这些检查（Prompt长度、显存要求、最大并发序列数要求）都是算法三第14行 `can_allocate_request()`的实现
+
             # check if we can fit the prefill in the batch
+            # [Chunking Logic] 计算这个新请求能分到多少 Budget
             next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
                 seq, num_batched_tokens
             )
 
+            # [Stop Condition] 预算已耗尽
+            # 如果计算结果为 0，说明 num_batched_tokens 已经达到了 chunk_size
+            # 此时停止接纳新请求
             if next_num_prefill_tokens == 0:
                 break
 
-            seq = self.waiting.pop(0)
-            self._allocate(seq)
-            num_batched_tokens += next_num_prefill_tokens
+            seq = self.waiting.pop(0)       # 1. 真正从等待队列移除
+            self._allocate(seq)             # 2. 在 Block Manager 中正式分配显存
+            num_batched_tokens += next_num_prefill_tokens   # 3. 扣除预算
+            # 4. 记录元数据：告诉引擎，这个新请求本轮只跑 next_num_prefill_tokens 这么长
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
                     seq, prompt_chunk_len=next_num_prefill_tokens
                 )
             )
+            # 5. 加入本轮运行名单
             running.append(seq)
 
+        ######################################################################
+        # 收尾
+        ######################################################################
         # make sure that prefills are at the start of the batch, so that we don't violate assumptions
         # made in the original vllm codebase
+        # 将本轮构建好的 running 列表（包含 Phase 1 的未处理完的老请求和 Phase 2 的新请求）赋值给 self.running，作为系统的最新状态。
         self.running = running
 
         return SchedulerOutputs(
