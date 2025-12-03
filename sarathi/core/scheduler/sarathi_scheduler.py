@@ -23,26 +23,26 @@ logger = init_logger(__name__)
 # 调度器在哪里被创建？ --> sarathi/engine/base_llm_engine.py
 class SarathiScheduler(BaseScheduler):
     """
-        【Sarathi-Serve 核心调度器】
+    【Sarathi-Serve 核心调度器】
 
-        该类实现了论文中的核心算法，旨在解决 LLM 推理中吞吐量与延迟的权衡问题。
-        它不同于传统的请求级调度（FasterTransformer）或纯迭代级调度（vLLM），
-        而是采用了 "Chunked-Prefills"（分块预填充）和 "Stall-free Batching"（无停顿批处理）。
+    该类实现了论文中的核心算法，旨在解决 LLM 推理中吞吐量与延迟的权衡问题。
+    它不同于传统的请求级调度（FasterTransformer）或纯迭代级调度（vLLM），
+    而是采用了 "Chunked-Prefills"（分块预填充）和 "Stall-free Batching"（无停顿批处理）。
 
-        核心机制：
-        1. Token Budget (令牌预算):
-           每次调度迭代（Iteration）都有一个计算量的硬性上限（self.chunk_size）。
-           调度器会确保每个 Batch 的总 Token 数不超过这个预算。
+    核心机制：
+    1. Token Budget (令牌预算):
+       每次调度迭代（Iteration）都有一个计算量的硬性上限（self.chunk_size）。
+       调度器会确保每个 Batch 的总 Token 数不超过这个预算。
 
-        2. Stall-free Batching (无停顿调度 - Algorithm 3):
-           - 优先权 1: 保证正在运行的 Decode 任务继续执行（低延迟）。
-           - 优先权 2: 利用 Decode 阶段剩余的显存和算力预算，"捎带"处理新请求的 Prefill。
-           - 结果: 新请求的加入不会导致正在运行的任务暂停（No Generation Stalls）。
+    2. Stall-free Batching (无停顿调度 - Algorithm 3):
+       - 优先权 1: 保证正在运行的 Decode 任务继续执行（低延迟）。
+       - 优先权 2: 利用 Decode 阶段剩余的显存和算力预算，"捎带"处理新请求的 Prefill。
+       - 结果: 新请求的加入不会导致正在运行的任务暂停（No Generation Stalls）。
 
-        3. Chunked-Prefills (分块预填充):
-           如果新请求的 Prompt 很长，超过了剩余的 Token Budget，
-           调度器会将其切分（Split），只运行一部分。剩余部分将在后续迭代中继续处理。
-        """
+    3. Chunked-Prefills (分块预填充):
+       如果新请求的 Prompt 很长，超过了剩余的 Token Budget，
+       调度器会将其切分（Split），只运行一部分。剩余部分将在后续迭代中继续处理。
+    """
     def __init__(
         self,
         model_config: ModelConfig,
@@ -284,7 +284,6 @@ class SarathiScheduler(BaseScheduler):
                 seq, num_batched_tokens
             )
 
-            # TODO：不知道这里什么意思，还需要理解
             # as long as the request could fit in the batch previously
             # it should be able to fit in the batch now
             # so in non-pipeline case this condition should always be false

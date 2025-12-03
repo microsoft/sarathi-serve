@@ -23,10 +23,10 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforg
 bash Mambaforge-Linux-x86_64.sh # follow the instructions from there
 ```
 
-Create a Python 3.10 environment,
+Create a Python 3.11 environment,
 
 ```sh
-mamba create -p ./env python=3.10 
+mamba create -p ./env python=3.11
 ```
 
 ### Install Sarathi-Serve
