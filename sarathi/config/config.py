@@ -164,7 +164,7 @@ class CacheConfig:
 @dataclass
 class ParallelConfig:
     pipeline_parallel_size: int = field(
-        default=2, metadata={"help": "Number of pipeline parallel groups."}
+        default=1, metadata={"help": "Number of pipeline parallel groups."}
     )
     tensor_parallel_size: int = field(
         default=1, metadata={"help": "Number of tensor parallel groups."}
