@@ -6,6 +6,7 @@ from sarathi.core.scheduler.orca_scheduler import OrcaScheduler
 from sarathi.core.scheduler.sarathi_scheduler import SarathiScheduler
 from sarathi.core.scheduler.simple_chunking_scheduler import SimpleChunkingScheduler
 from sarathi.core.scheduler.vllm_scheduler import VLLMScheduler
+from sarathi.core.scheduler.deadline_scheduler import DeadlineScheduler
 from sarathi.utils.base_registry import BaseRegistry
 
 
@@ -21,3 +22,4 @@ SchedulerRegistry.register(SchedulerType.ORCA, OrcaScheduler)
 SchedulerRegistry.register(SchedulerType.FASTER_TRANSFORMER, FasterTransformerScheduler)
 SchedulerRegistry.register(SchedulerType.SARATHI, SarathiScheduler)
 SchedulerRegistry.register(SchedulerType.SIMPLE_CHUNKING, SimpleChunkingScheduler)
+SchedulerRegistry.register(SchedulerType.DEADLINE, DeadlineScheduler)

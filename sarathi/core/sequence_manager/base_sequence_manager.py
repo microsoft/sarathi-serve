@@ -19,6 +19,9 @@ class BaseSequenceManager(ABC):
 
     def __init__(self, config: SystemConfig):
         self.seq_map: Dict[str, Sequence] = {}
+        self.enable_sequence_pipeline_parallel = (
+            config.parallel_config.enable_sequence_pipeline_parallel
+        )
 
     @synchronized
     def add_seq(self, seq: Sequence) -> None:
@@ -128,19 +131,69 @@ class BaseSequenceManager(ABC):
                 continue
 
             if not seq.prompt_processing_finished:
-                seq.update_prompt_tokens_stage_processed(
-                    scheduled_seq_metadata.prompt_chunk_len
-                )
+                if not self.enable_sequence_pipeline_parallel:
+                    seq.update_prompt_tokens_stage_processed(
+                        scheduled_seq_metadata.prompt_chunk_len
+                    )
                 seq.update_prompt_tokens_processed(
                     scheduled_seq_metadata.prompt_chunk_len
                 )
 
-            self._pause_seq(scheduled_seq_metadata.seq_id)
+            if self.enable_sequence_pipeline_parallel:
+                if not seq.prompt_stage_processing_finished:
+                    # for prompts that are running in sequence parallel manner
+                    # they would get unpaused at the end of the stage
+                    pass
+                elif (
+                    seq.prompt_stage_processing_finished
+                    and not seq.prompt_processing_finished
+                ):
+                    # this is the transition phase where the first stage has finished processing the prompt
+                    # but there are intermediate micro-batches which are remaining before the prompt processing actually completes
+                    pass
+                elif seq.prompt_processing_finished:
+                    self._pause_seq(scheduled_seq_metadata.seq_id)
+            else:
+                self._pause_seq(scheduled_seq_metadata.seq_id)
 
             self._process_seq_output(
                 seq,
                 sampler_output,
             )
+
+    @synchronized
+    def on_stage_completed(
+        self,
+        scheduler_outputs: SchedulerOutputs,
+    ) -> None:
+        """
+        This gets called only when pipeline parallel is enabled.
+        The engine calls this when the first pipeline stage completed (engine-side) + each worker will
+        call this method separately.
+        """
+        if not self.enable_sequence_pipeline_parallel:
+            return
+
+        for scheduled_seq_metadata in scheduler_outputs.scheduled_seq_metadata_list:
+            seq = self.seq_map[scheduled_seq_metadata.seq_id]
+            assert not seq.is_finished()
+
+            if seq.is_waiting():
+                # seq is preempted
+                # this can happen with pipeline parallel -- if the system
+                # runs out of memory, it will preempt the last arrived request
+                # this request might still be executing when the next stage scheduling
+                # triggers the preemption
+                continue
+
+            if seq.prompt_stage_processing_finished:
+                continue
+
+            seq.update_prompt_tokens_stage_processed(
+                scheduled_seq_metadata.prompt_chunk_len
+            )
+            if not seq.prompt_stage_processing_finished:
+                self._pause_seq(scheduled_seq_metadata.seq_id)
 
     def generate_request_outputs(
         self,

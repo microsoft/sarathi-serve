@@ -28,7 +28,7 @@ from transformers import FalconConfig as HF_FalconConfig
 
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
-from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
+from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.rotary_embedding import get_rope
 from sarathi.model_executor.parallel_utils.parallel_state import (
     get_pipeline_model_parallel_rank,
@@ -51,6 +51,7 @@ from sarathi.model_executor.weight_utils import (
     load_tensor_parallel_weights,
 )
 from sarathi.transformers_utils.configs import RWConfig
+from sarathi.worker.cache_engine import KVCache
 
 FalconConfig = Union[HF_FalconConfig, RWConfig]
 
@@ -173,8 +174,7 @@ class FalconAttention(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        layer_cache_idx: int,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_cache: KVCache,
     ) -> torch.Tensor:
         if not self.new_decoder_architecture and self.multi_query:
             q, bias = self.query(hidden_states)
@@ -191,11 +191,11 @@ class FalconAttention(nn.Module):
             with self._attn_rope_timer:
                 q, k = self.rotary_emb(positions, q, k)
 
-        attn_output = attention_backend_wrapper.forward(
+        attn_output = get_attention_wrapper().forward(
             q,
             k,
             v,
-            layer_cache_idx,
+            kv_cache,
             self.inv_norm_factor,
         )
         attn_output, bias = self.dense(attn_output)
@@ -276,8 +276,7 @@ class FalconDecoderLayer(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        layer_cache_idx: int,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_cache: KVCache,
     ):
         residual = hidden_states
 
@@ -291,8 +290,7 @@ class FalconDecoderLayer(nn.Module):
         attention_output, attention_bias = self.self_attention(
             positions=positions,
             hidden_states=attention_layernorm_out,
-            layer_cache_idx=layer_cache_idx,
-            attention_backend_wrapper=attention_backend_wrapper,
+            kv_cache=kv_cache,
         )
         if self.reduce_row_parallel_results and attention_bias is not None:
             attention_output += attention_bias
@@ -364,7 +362,7 @@ class FalconModel(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_caches: List[KVCache],
     ) -> torch.Tensor:
         if self.word_embeddings:
             hidden_states = self.word_embeddings(hidden_states)
@@ -372,7 +370,9 @@ class FalconModel(nn.Module):
         for i in range(len(self.h)):
             layer = self.h[i]
             hidden_states = layer(
-                positions, hidden_states, i, attention_backend_wrapper
+                positions,
+                hidden_states,
+                kv_caches[i],
             )
         if self.ln_f:
             hidden_states = self.ln_f(hidden_states)
@@ -404,7 +404,7 @@ class FalconForCausalLM(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_caches: List[KVCache],
     ) -> torch.Tensor:
         if not self.is_pipeline_first_stage:
             # hidden_states_shape: num_tokens x hidden_size
@@ -415,9 +415,7 @@ class FalconForCausalLM(nn.Module):
             )
             hidden_states = recv(hidden_states)
 
-        hidden_states = self.transformer(
-            hidden_states, positions, attention_backend_wrapper
-        )
+        hidden_states = self.transformer(hidden_states, positions, kv_caches)
 
         if not self.is_pipeline_last_stage:
             send(hidden_states)

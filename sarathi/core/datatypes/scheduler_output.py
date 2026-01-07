@@ -43,6 +43,35 @@ class SchedulerOutputs:
     @property
     def seq_ids(self) -> List[str]:
         return [metadata.seq_id for metadata in self.scheduled_seq_metadata_list]
+    
+    @property
+    def seq_total_decode_context(self) -> int:
+        return sum(metadata.decode_context_size for metadata in self.scheduled_seq_metadata_list)
+    
+    @property
+    def seq_total_prefill_context(self) -> int:
+        return sum(metadata.prefill_context_size for metadata in self.scheduled_seq_metadata_list)
+    
+    @property
+    def seq_min_decode_slack(self) -> float:
+        return min(metadata.decode_slack for metadata in self.scheduled_seq_metadata_list)
+    
+    @property
+    def seq_two_slack_count(self) -> int:
+        # ignore metadata with decode_slack == 1e9
+        return sum(metadata.decode_slack >= 0.2 and metadata.decode_slack < 10000 for metadata in self.scheduled_seq_metadata_list)
+
+    @property
+    def seq_three_slack_count(self) -> int:
+        return sum(metadata.decode_slack >= 0.3 and metadata.decode_slack < 10000 for metadata in self.scheduled_seq_metadata_list)
+    
+    @property
+    def seq_four_slack_count(self) -> int:
+        return sum(metadata.decode_slack >= 0.4 and metadata.decode_slack < 10000 for metadata in self.scheduled_seq_metadata_list)
+    
+    @property
+    def seq_five_slack_count(self) -> int:
+        return sum(metadata.decode_slack >= 0.5 and metadata.decode_slack < 10000 for metadata in self.scheduled_seq_metadata_list)
 
     def __repr__(self) -> str:
         return (

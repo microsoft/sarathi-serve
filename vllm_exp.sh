@@ -1,0 +1,23 @@
+python -m sarathi.benchmark.main \
+    --output_dir benchmark_output \
+    --scheduler_config_type 'VLLM' \
+    --interval_generator_config_type 'POISSON' \
+    --poisson_request_interval_generator_config_qps 1.60 \
+    --synthetic_request_generator_config_num_requests 10000 \
+    --worker_config_attention_backend 'FLASHINFER' \
+    --fixed_request_length_generator_config_decode_tokens 375 \
+    --fixed_request_length_generator_config_prefill_tokens 3750 \
+    --vllm_scheduler_config_max_num_seqs 1000 \
+    --vllm_scheduler_config_max_batched_tokens 12500 \
+    --time_limit 1000000000000 \
+    --model_config_load_format 'DUMMY' \
+    --length_generator_config_type 'TRACE' \
+    --request_generator_config_type 'SYNTHETIC' \
+    --model_config_model 'meta-llama/Meta-Llama-3-8B' \
+    --parallel_config_pipeline_parallel_size 1 \
+    --parallel_config_tensor_parallel_size 1 \
+    --worker_config_gpu_memory_utilization 0.97 \
+    --metrics_config_keep_individual_batch_metrics \
+    --metrics_config_enable_cpu_op_level_metrics \
+    --vllm_scheduler_config_max_num_seqs 512 \
+    --model_config_max_model_len 12500 \

@@ -1,5 +1,5 @@
 import json
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, BooleanOptionalAction
 from collections import defaultdict, deque
 from dataclasses import MISSING
 from dataclasses import field as dataclass_field
@@ -97,13 +97,22 @@ def create_from_cli_args(cls) -> Any:
 
         # handle cases with default and default factory args
         if field.default is not MISSING:
-            parser.add_argument(
-                f"--{field.name}",
-                type=field_type,
-                default=field.default,
-                nargs=nargs,
-                help=help_text,
-            )
+            if field_type is bool:
+                parser.add_argument(
+                    f"--{field.name}",
+                    action=BooleanOptionalAction,
+                    default=field.default,
+                    type=bool,
+                    help=help_text
+                )
+            else:
+                parser.add_argument(
+                    f"--{field.name}",
+                    type=field_type,
+                    default=field.default,
+                    nargs=nargs,
+                    help=help_text,
+                )
         elif field.default_factory is not MISSING:
             parser.add_argument(
                 f"--{field.name}",

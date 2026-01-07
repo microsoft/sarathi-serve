@@ -1,5 +1,4 @@
 """Sequence and its related classes."""
-
 from typing import List, Optional
 
 from sarathi.core.datatypes.block import LogicalTokenBlock
@@ -7,7 +6,9 @@ from sarathi.core.datatypes.sampling_params import SamplingParams
 from sarathi.core.datatypes.sequence_state import SequenceState
 from sarathi.core.datatypes.sequence_status import SequenceStatus
 
+import random
 
+TIER_DEADLINES = [6.0, 600.0, 1800.0]
 class Sequence:
     """Stores the data, status, and block information of a sequence.
 
@@ -56,6 +57,66 @@ class Sequence:
         self.tokens: Optional[List[str]] = None
 
         self.state = SequenceState(seq_id, arrival_time, len(prompt_token_ids))
+
+        # Used for deadline scheduling
+        self.ttft_deadline = arrival_time
+        
+        self.mem_allocated = False
+        self.batch_id_arrived = None
+        self.last_slack = 1e9
+        self.priority = 1
+        self.drop = 0
+
+        NUM_TIERS = len(TIER_DEADLINES)
+
+        # randomly assign a tier to the request between 0 and NUM_TIERs - 1
+        self.tier = random.randint(0, NUM_TIERS - 1)
+        self.tier_deadline = TIER_DEADLINES[self.tier]
+        self.ttft_deadline = self.tier_deadline
+        
+        # For when the SLA is TTLT and not TTFT, if we are provided the number of decode tokens
+        self.num_decode_tokens = -1
+        self.hybrid_prioritization_param = 0.008
+        self.scheduler_type = 'fcfs'  # default scheduler type
+
+
+    def __eq__ (self, other: object) -> bool:
+        if not isinstance(other, Sequence):
+            raise NotImplementedError()
+        return self.seq_id == other.seq_id
+
+    def __lt__(self, other: object) -> bool:
+        if self.scheduler_type == 'fcfs':
+            return self.arrival_time < other.arrival_time
+
+        if self.scheduler_type == 'edf':
+            return (self.ttft_deadline + self.arrival_time) < (other.ttft_deadline + other.arrival_time)
+
+        self_remaining_tokens = self.get_prompt_len() - self.get_num_prompt_tokens_processed()
+        other_remaining_tokens = other.get_prompt_len() - other.get_num_prompt_tokens_processed()
+        if self.scheduler_type == 'srpf':
+            return self_remaining_tokens < other_remaining_tokens
+        if self.drop != other.drop:
+            return self.drop < other.drop
+    
+        
+
+        # hybrid_prioritization_param is the constant dictating the weightage 
+        # to give to arrival time and remaining tokens, Hybrid Prioritization
+        self_deadline = self.ttft_deadline + self.arrival_time + (self.hybrid_prioritization_param * self_remaining_tokens)
+        other_deadline = other.ttft_deadline + other.arrival_time + (other.hybrid_prioritization_param * other_remaining_tokens)
+        # The request with lower deadline should be scheduled first
+        return self_deadline < other_deadline
+
+    def _get_TBT_deadline(self, execution_threshold: float, execution_threshold_batched: float) -> float:
+        ttft = self.state._arrived_at + max(self.state.e2e_prefill_time, self.ttft_deadline)
+        decode_iteration = len(self.output_token_ids) + 1
+        if self.tier > 0:
+            execution_threshold = execution_threshold_batched
+        return ttft + (execution_threshold * decode_iteration)
+    
+    def _get_context_size(self) -> int:
+        return len(self.output_token_ids) + self.prompt_tokens_processed
 
     def get_status(self) -> SequenceStatus:
         return self.state._status
@@ -147,8 +208,7 @@ class Sequence:
         start = self.prompt_tokens_stage_processed
         end = start + chunk_size
         assert end <= len(self.prompt_token_ids), (
-            f"End index {end} is greater than the prompt length "
-            f"{len(self.prompt_token_ids)}"
+            self.seq_id, chunk_size, start, end, len(self.prompt_token_ids), self.prompt_tokens_stage_processed
         )
         return self.prompt_token_ids[start:end]
 
@@ -180,6 +240,9 @@ class Sequence:
         self.prompt_stage_processing_finished = False
         self.prompt_token_ids = self.prompt_token_ids + self.output_token_ids
         self.output_token_ids = []
+        self.logical_token_blocks: List[LogicalTokenBlock] = []
+        self._append_tokens_to_blocks(self.prompt_token_ids)
+        self.state = SequenceState(self.seq_id, self.arrival_time, len(self.prompt_token_ids))
 
     def check_stop(self) -> None:
         """Stop the finished sequences."""
@@ -231,9 +294,15 @@ class SequenceScheduleMetadata:
         self,
         seq_id: str,
         prompt_chunk_len: int,
+        decode_context_size: int,
+        prefill_context_size: int,
+        decode_slack: float,
     ) -> None:
         self.seq_id = seq_id
         self.prompt_chunk_len = prompt_chunk_len
+        self.decode_context_size = decode_context_size
+        self.prefill_context_size = prefill_context_size
+        self.decode_slack = decode_slack
 
     @property
     def num_prompt_tokens(self) -> int:
@@ -264,8 +333,13 @@ class SequenceScheduleMetadata:
                 prompt_chunk_len = 0
             else:
                 prompt_chunk_len = seq.get_prompt_len()
-
-        return cls(seq_id=seq.seq_id, prompt_chunk_len=prompt_chunk_len)
+        decode_context_size = 0
+        prefill_context_size = 0
+        if seq.prompt_stage_processing_finished:
+            decode_context_size = seq._get_context_size()
+        else:
+            prefill_context_size = seq._get_context_size()
+        return cls(seq_id=seq.seq_id, prompt_chunk_len=prompt_chunk_len, decode_context_size=decode_context_size, prefill_context_size=prefill_context_size, decode_slack=seq.last_slack)
 
     def __str__(self) -> str:
         return (

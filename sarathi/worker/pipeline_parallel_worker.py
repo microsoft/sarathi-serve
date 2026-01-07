@@ -6,6 +6,7 @@ import torch
 import torch.distributed
 import zmq
 
+from sarathi.config import SystemConfig
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs
 from sarathi.logger import init_logger
@@ -38,8 +39,9 @@ class PipelineParallelWorker(BaseWorker):
         self, scheduler_outputs: SchedulerOutputs, sampler_outputs: SamplerOutputs
     ) -> None:
         # in pipeline parallel case, each stage won't have sampler output
-        # so we don't do anything here
-        pass
+        # so we need to do the book keeping update later, here we just want to update the stuff for
+        # this stage completion
+        self.seq_manager.on_stage_completed(scheduler_outputs)
 
     @synchronized
     def on_sampling_completed(

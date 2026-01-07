@@ -72,6 +72,8 @@ class SchedulerConfig:
     scheduler: str
     batch_size: int
     chunk_size: Optional[int] = None
+    execution_threshold: Optional[float] = None
+    scheduler_type: Optional[str] = None
 
     def get_key(self):
         key = f"{self.scheduler}_bs{self.batch_size}"
@@ -101,6 +103,14 @@ class SchedulerConfig:
                 "scheduler_config_type": "SARATHI",
                 "sarathi_scheduler_config_max_num_seqs": self.batch_size,
                 "sarathi_scheduler_config_chunk_size": self.chunk_size,
+            }
+        elif self.scheduler == "deadline":
+            assert self.chunk_size is not None
+            return {
+                "scheduler_config_type": "DEADLINE",
+                "deadline_scheduler_execution_threshold": self.execution_threshold,
+                "deadline_scheduler_chunk_size": self.chunk_size,
+                "deadline_scheduler_scheduler_type": self.scheduler_type,
             }
         else:
             raise ValueError(f"Unknown scheduler: {self.scheduler}")

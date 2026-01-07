@@ -8,6 +8,7 @@ from sarathi.benchmark.config import BenchmarkConfig
 from sarathi.benchmark.constants import LOGGER_FORMAT, LOGGER_TIME_FORMAT
 from sarathi.benchmark.utils.random import set_seeds
 from sarathi.logger import init_logger
+import torch
 
 logger = init_logger(__name__)
 
@@ -28,6 +29,7 @@ def main() -> None:
         format=LOGGER_FORMAT, level=log_level, datefmt=LOGGER_TIME_FORMAT
     )
 
+    torch.cuda.synchronize()
     runner = BenchmarkRunnerLauncher(config)
     runner.run()
 

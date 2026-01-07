@@ -1,29 +1,25 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional
 
 import torch
-from flashinfer import (
-    BatchPrefillWithPagedKVCacheWrapper,
-    append_paged_kv_cache,
-    get_batch_indices_positions,
-    get_seq_lens,
-)
+from flashinfer import BatchPrefillWithPagedKVCacheWrapper, append_paged_kv_cache
 
-from sarathi.config import CacheConfig, ModelConfig, ParallelConfig
+from sarathi.config import ModelConfig, ParallelConfig
 from sarathi.core.datatypes.sequence import SequenceMetadata
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
 
 
 class FlashinferAttentionWrapper(BaseAttentionWrapper):
+    _inst = None
 
-    def __init__(
+    def init(
         self,
         model_config: ModelConfig,
         parallel_config: ParallelConfig,
-        cache_config: CacheConfig,
+        block_size: int,
         device: torch.device,
     ):
-        super().__init__(model_config, parallel_config, cache_config, device)
+        super().init(model_config, parallel_config, block_size, device)
 
         prefill_workspace_buffer = torch.empty(
             128 * 1024 * 1024, dtype=torch.uint8, device=device
@@ -53,18 +49,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
 
     def to_int_tensor(self, data: List[int]) -> torch.Tensor:
         return torch.tensor(data, dtype=torch.int32, device="cuda")
-
-    def init_gpu_cache(self, num_gpu_blocks: int) -> None:
-        gpu_cache: List[torch.Tensor] = []
-        self.num_gpu_blocks = num_gpu_blocks
-
-        for _ in range(self.num_layers):
-            gpu_blocks = self.get_cache_block(
-                self.num_gpu_blocks, dtype=self.dtype, device="cuda"
-            )
-            gpu_cache.append(gpu_blocks)
-
-        self.gpu_cache = gpu_cache
 
     def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
         return torch.randn(
@@ -155,11 +139,9 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             self.contains_decode = True
 
             context_len = seq_metadata.seq.get_len()
-
-            # indptr for the decode tokens in q/o tensor (1 token per sequence)
+            # indptr for the prompt tokens in q/o tensor
             decode_qo_indptr.append(decode_qo_indptr[-1] + 1)
-
-            # Compute the kv page indices for the decode tokens
+            # Compute the kv page indices for the prompt tokens.
             num_blocks_in_use = (context_len + self.block_size - 1) // self.block_size
             decode_kv_page_indices.extend(seq_metadata.block_table[:num_blocks_in_use])
             decode_kv_page_indptr.append(decode_kv_page_indptr[-1] + num_blocks_in_use)
@@ -177,7 +159,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 self.num_kv_heads,
                 self.head_dim,
                 self.block_size,
-                causal=True,
             )
 
         if self.contains_decode:
@@ -193,8 +174,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             )
 
         self.num_prefill_tokens = prefill_qo_indptr[-1]
-        num_decode_tokens = len(decode_qo_indptr) - 1
-        self.num_total_tokens = self.num_prefill_tokens + num_decode_tokens
+        self.num_total_tokens = self.num_prefill_tokens + len(decode_qo_indptr) - 1
 
         self.append_qo_indptr_tensor = self.to_int_tensor(
             prefill_qo_indptr[:-1]
@@ -211,23 +191,6 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             prefill_kv_last_page_len + decode_kv_last_page_len
         )
 
-        # Compute sequence lengths from KV cache metadata
-        seq_lens_from_cache = get_seq_lens(
-            self.append_kv_page_indptr_tensor,
-            self.append_kv_last_page_len_tensor,
-            self.block_size,
-        )
-
-        # Generate batch_indices and positions for append operation
-        batch_indices_unpadded, positions_unpadded = get_batch_indices_positions(
-            self.append_qo_indptr_tensor,
-            seq_lens_from_cache,
-            self.num_total_tokens,
-        )
-
-        self.append_batch_indices_tensor = batch_indices_unpadded
-        self.append_positions_tensor = positions_unpadded
-
     def end_forward(self):
         if self.contains_prefill:
             self.prefill_wrapper.end_forward()
@@ -242,7 +205,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        layer_cache_idx: int,
+        kv_cache: torch.Tensor,
         softmax_scale: float = 1.0,
         layer_id: Optional[int] = None,
     ) -> torch.Tensor:
@@ -261,11 +224,10 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
 
         with self.get_timer(OperationMetrics.ATTN_KV_CACHE_SAVE, layer_id):
             append_paged_kv_cache(
-                key[: self.num_total_tokens],
-                value[: self.num_total_tokens],
-                self.append_batch_indices_tensor,
-                self.append_positions_tensor,
-                self.gpu_cache[layer_cache_idx],
+                key,
+                value,
+                self.append_qo_indptr_tensor,
+                kv_cache,
                 self.append_kv_page_indices_tensor,
                 self.append_kv_page_indptr_tensor,
                 self.append_kv_last_page_len_tensor,
@@ -276,8 +238,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
             if self.contains_prefill:
                 output[: self.num_prefill_tokens] = self.prefill_wrapper.forward(
                     query[: self.num_prefill_tokens],
-                    self.gpu_cache[layer_cache_idx],
-                    causal=True,
+                    kv_cache,
                     pos_encoding_mode="NONE",
                     sm_scale=softmax_scale,
                 )
@@ -287,7 +248,7 @@ class FlashinferAttentionWrapper(BaseAttentionWrapper):
                 output[self.num_prefill_tokens : self.num_total_tokens] = (
                     self.decode_wrapper.forward(
                         query[self.num_prefill_tokens : self.num_total_tokens],
-                        self.gpu_cache[layer_cache_idx],
+                        kv_cache,
                         pos_encoding_mode="NONE",
                         sm_scale=softmax_scale,
                     )

@@ -13,6 +13,7 @@ class SchedulerType(Enum):
     FASTER_TRANSFORMER = "FASTER_TRANSFORMER"
     SARATHI = "SARATHI"
     SIMPLE_CHUNKING = "SIMPLE_CHUNKING"
+    DEADLINE = "DEADLINE"
 
 
 class RequestGeneratorType(Enum):

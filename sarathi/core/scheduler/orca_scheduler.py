@@ -7,6 +7,7 @@ from sarathi.core.block_space_manager.orca_block_space_manager import (
 )
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SequenceScheduleMetadata
+from sarathi.core.datatypes.sequence_status import SequenceStatus
 from sarathi.core.scheduler.base_scheduler import BaseScheduler
 from sarathi.logger import init_logger
 

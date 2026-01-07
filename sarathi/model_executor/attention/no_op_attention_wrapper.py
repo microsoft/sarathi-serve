@@ -8,8 +8,9 @@ from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentio
 
 
 class NoOpAttentionWrapper(BaseAttentionWrapper):
+    _inst = None
 
-    def __init__(
+    def init(
         self,
         model_config: ModelConfig,
         parallel_config: ParallelConfig,
@@ -18,13 +19,9 @@ class NoOpAttentionWrapper(BaseAttentionWrapper):
     ):
         self.device = device
 
-    def init_gpu_cache(self, num_gpu_blocks: int) -> None:
-        pass
-
-    def get_cache_block(self, num_blocks: int, **kwargs) -> torch.Tensor:
-        pass
-
-    def get_cache_block_size(self) -> int:
+    def get_cache_block(
+        self, num_blocks: int, **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         pass
 
     def begin_forward(
@@ -41,7 +38,7 @@ class NoOpAttentionWrapper(BaseAttentionWrapper):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        layer_cache_idx: int,
+        kv_cache: Tuple[torch.Tensor, torch.Tensor],
         softmax_scale: float = 1.0,
         layer_id: Optional[int] = None,
     ) -> torch.Tensor:

@@ -127,7 +127,8 @@ class BenchmarkRunner:
 
     def _add_requests(self) -> None:
         index = 0
-        first_request_time = time.monotonic()
+        # The first request is added with a delay of 0.002 seconds per request to allow room from now till when the LLM engine is ready to process the request
+        first_request_time = time.monotonic() + (0.002 * len(self.requests))
         while index < len(self.requests):
             request = self.requests[index]
             self.llm_engine.add_request(

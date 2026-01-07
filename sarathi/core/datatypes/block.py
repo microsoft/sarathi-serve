@@ -1,12 +1,8 @@
 """Token blocks."""
 
-from typing import List, Tuple, Union
-
-from torch import Tensor
+from typing import List
 
 _BLANK_TOKEN_ID = -1
-
-KVCache = Union[Tuple[Tensor, Tensor], Tensor]
 
 
 class LogicalTokenBlock:

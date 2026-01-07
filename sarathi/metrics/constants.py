@@ -64,6 +64,8 @@ class SequenceMetricsTimeDistributions(enum.Enum):
     DECODE_TIME_EXECUTION_PLUS_PREEMPTION_NORMALIZED = (
         "decode_time_execution_plus_preemption_normalized"
     )
+    BATCH_ARRIVED_AT = "batch_arrived_at"
+    REQUEST_TIER = "request_tier"
 
 
 class TokenMetricsTimeDistribution(enum.Enum):
@@ -94,6 +96,13 @@ class BatchMetricsCountDistribution(enum.Enum):
     BATCH_NUM_PREFILL_TOKENS = "batch_num_prefill_tokens"
     BATCH_NUM_DECODE_TOKENS = "batch_num_decode_tokens"
     BATCH_SIZE = "batch_size"
+    BATCH_DECODE_CONTEXT = "batch_decode_context"
+    BATCH_PREFILL_CONTEXT = "batch_prefill_context"
+    BATCH_MIN_DECODE_SLACK = "batch_min_decode_slack"
+    BATCH_TWO_SLACK_COUNT = "batch_two_slack_count"
+    BATCH_THREE_SLACK_COUNT = "batch_three_slack_count"
+    BATCH_FOUR_SLACK_COUNT = "batch_four_slack_count"
+    BATCH_FIVE_SLACK_COUNT = "batch_five_slack_count"
 
 
 class BatchMetricsTimeDistribution(enum.Enum):

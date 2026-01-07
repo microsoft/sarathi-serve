@@ -14,6 +14,9 @@ from sarathi.core.block_space_manager.simple_chunking_block_space_manager import
 from sarathi.core.block_space_manager.vllm_block_space_manager import (
     VLLMBlockSpaceManager,
 )
+from sarathi.core.block_space_manager.deadline_block_space_manager import (
+    DeadlineBlockSpaceManager,
+)
 from sarathi.utils.base_registry import BaseRegistry
 
 
@@ -33,3 +36,5 @@ BlockSpaceManagerRegistry.register(SchedulerType.SARATHI, SarathiBlockSpaceManag
 BlockSpaceManagerRegistry.register(
     SchedulerType.SIMPLE_CHUNKING, SimpleChunkingBlockSpaceManager
 )
+BlockSpaceManagerRegistry.register(SchedulerType.DEADLINE, DeadlineBlockSpaceManager)
+

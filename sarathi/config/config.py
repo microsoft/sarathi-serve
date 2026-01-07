@@ -9,6 +9,7 @@ from sarathi.logger import init_logger
 from sarathi.transformers_utils.config import get_config
 from sarathi.types import AttentionBackend, ResourceMapping, SchedulerType
 from sarathi.utils.hf_utils import get_and_verify_dtype, get_and_verify_max_len
+import os
 
 logger = init_logger(__name__)
 
@@ -169,8 +170,14 @@ class ParallelConfig:
     tensor_parallel_size: int = field(
         default=1, metadata={"help": "Number of tensor parallel groups."}
     )
+    enable_sequence_pipeline_parallel: bool = field(
+        default=False, metadata={"help": "Enable sequence pipeline parallelism."}
+    )
 
     def __post_init__(self):
+        if self.enable_sequence_pipeline_parallel:
+            assert self.pipeline_parallel_size > 1
+
         self.world_size = self.pipeline_parallel_size * self.tensor_parallel_size
 
 
@@ -274,6 +281,38 @@ class SarathiSchedulerConfig(BaseSchedulerConfig):
     def get_type():
         return SchedulerType.SARATHI
 
+@dataclass
+class DeadlineSchedulerConfig(BaseSchedulerConfig):
+    chunk_size: int = field(
+        default=512, metadata={"help": "Size of each chunk for Deadline scheduler."}
+    )
+    execution_threshold: float = field(
+        default=0.100,
+        metadata={"help": "Execution threshold(TBT) in seconds."}
+    )
+    execution_threshold_batched: float = field(
+        default=0.400,
+        metadata={"help": "Execution threshold(TBT) in seconds allowed for non-interactive requests"}
+    )
+    scheduler_type: str = field(
+        default="deadline",
+        metadata={"help": "Type of deadline scheduler: 'deadline', 'deadline_no_dynamic_chunking, 'srpf', 'edf' or 'fcfs'."}
+    )
+    output_len_pred: int = field(
+        default = 15,
+        metadata={"help": "Predicted output length for each non-interactive request."}
+    )
+    hybrid_prioritization_param: float = field(
+        default = 0.008,
+        metadata={"help": "Parameter for hybrid prioritization in deadline scheduler."}
+    )
+
+    def get_max_num_batched_tokens(self, max_model_len: int):
+        return self.chunk_size
+
+    @staticmethod
+    def get_type():
+        return SchedulerType.DEADLINE
 
 @dataclass
 class MetricsConfig:
@@ -332,7 +371,25 @@ class ReplicaConfig:
             self.resource_mapping = [
                 (None, i) for i in range(world_size)  # List of (node_ip, gpu_id)
             ]
-        return self.resource_mapping
+        
+        print("Resource mapping before: ", self.resource_mapping)
+        
+        # Read CUDA_VISIBLE_DEVICES and return mapping based on available GPUs
+        cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES', '')
+        print(f"CUDA_VISIBLE_DEVICES: {cuda_visible_devices if cuda_visible_devices else 'Not set'}")
+        
+        if cuda_visible_devices:
+            # Parse CUDA_VISIBLE_DEVICES to get the actual GPU IDs
+            gpu_ids = [int(x.strip()) for x in cuda_visible_devices.split(',')]
+            print(f"Parsed GPU IDs: {gpu_ids}")
+            
+            final_mapping = [(None, gpu_id) for gpu_id in gpu_ids]
+            print("Final resource mapping: ", final_mapping)
+            return final_mapping
+        else:
+            # Fallback to original mapping if CUDA_VISIBLE_DEVICES is not set
+            print("Using fallback resource mapping: ", self.resource_mapping)
+            return self.resource_mapping
 
 
 @dataclass
@@ -405,6 +462,7 @@ class BaseEndpointConfig(ABC):
         system_config = SystemConfig(
             replica_config=replica_config,
             model_config=self.model_config,
+            worker_config=self.worker_config,
             cache_config=self.cache_config,
             parallel_config=self.parallel_config,
             scheduler_config=self.scheduler_config,

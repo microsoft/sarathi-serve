@@ -406,7 +406,12 @@ class MetricsStore:
             self._get_seq_id(seq.seq_id),
             seq.state.decode_execution_plus_preemption_time_normalized,
         )
-
+        self.seq_metrics_time_distributions[
+            SequenceMetricsTimeDistributions.BATCH_ARRIVED_AT
+        ].put(self._get_seq_id(seq.seq_id), seq.batch_id_arrived)
+        self.seq_metrics_time_distributions[
+            SequenceMetricsTimeDistributions.REQUEST_TIER
+        ].put(self._get_seq_id(seq.seq_id), seq.tier)
     def _update_per_token_execution_times(
         self,
         batch_end_time: float,
@@ -533,7 +538,27 @@ class MetricsStore:
         self.batch_metrics_count_distribution[
             BatchMetricsCountDistribution.BATCH_NUM_DECODE_TOKENS
         ].put_pair(scheduler_outputs.id, scheduler_outputs.num_batched_output_tokens)
-
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_DECODE_CONTEXT
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_total_decode_context)
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_PREFILL_CONTEXT
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_total_prefill_context)
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_MIN_DECODE_SLACK
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_min_decode_slack)
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_TWO_SLACK_COUNT
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_two_slack_count)
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_THREE_SLACK_COUNT
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_three_slack_count)
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_FOUR_SLACK_COUNT
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_four_slack_count)
+        self.batch_metrics_count_distribution[
+            BatchMetricsCountDistribution.BATCH_FIVE_SLACK_COUNT
+        ].put_pair(scheduler_outputs.id, scheduler_outputs.seq_five_slack_count)
         self.batch_metrics_count_distribution[
             BatchMetricsCountDistribution.BATCH_SIZE
         ].put_pair(scheduler_outputs.id, len(seq_metadata_list))

@@ -38,6 +38,13 @@ class SimpleChunkingScheduler(BaseScheduler):
 
         self.chunk_size = self.scheduler_config.chunk_size
         self.whose_turn = Turn.PREFILL
+        self.P = 2625
+        self.B = 562
+        self.M = self.chunk_size
+        self.prompt_limit = self.P
+        self.count = 0
+        self.begin_decodes = False
+        self.done = False
 
     def get_block_space_manager_class(self):
         return VLLMBlockSpaceManager
@@ -66,140 +73,167 @@ class SimpleChunkingScheduler(BaseScheduler):
         # The total number of sequences on the fly, including the
         # requests in the generation phase.
         num_batched_tokens = 0
+
+
         # Optimization: We do not sort the waiting queue since the preempted
         # sequence groups are added to the front and the new sequence groups
         # are added to the back.
 
         self.running = self.policy.sort_by_priority(now, self.running)
 
-        while self.running and self.whose_turn == Turn.PREFILL:
+        while (
+            self.begin_decodes and
+            self.running
+        ):
+
+            # Stop once we reach a prefill
+            if not self.running[0].prompt_processing_finished:
+                break
+
             seq = self.running.pop(0)
 
-            if not seq.is_paused():
-                # The sequence group is already in the RUNNING state.
-                running.append(seq)
-                continue
+            assert seq.is_paused(), "Sequence should be in PAUSED state"
 
-            if seq.prompt_stage_processing_finished:
-                running.append(seq)
-                continue
+            # Break if deadlines are too far ahead
+            # if trigger or ((prefill_available) and (num_seqs < 275) and (seq.get_deadline(self.execution_threshold) >= (now + (0.1 * 2)))):
+            #     unsched_decodes.append(seq)
+            #     trigger = True
+            #     continue
 
-            next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
-                seq, num_batched_tokens
-            )
+            # No pre-emption support, try-catch the failed allocations
+            if not(self.block_manager.can_append_slot()):
+                self.done = True
+                break
+            # try:
+            #     assert self.block_manager.can_append_slot()
 
-            if next_num_prefill_tokens == 0:
-                # not enough token space to allocate the sequence
-                running.append(seq)
-                continue
-
-            num_batched_tokens += next_num_prefill_tokens
+            # except AssertionError:
+            #     print("Failed to allocate slot")
+            #     print(num_seqs, num_decs, len(self.waiting), len(self.running))
+            self._append_slot(seq)
             running.append(seq)
             scheduled_seq_metadata_list.append(
-                SequenceScheduleMetadata.from_sequence(
-                    seq, prompt_chunk_len=next_num_prefill_tokens
-                )
-            )
-
-        if running:
-            assert not self.running
-            self.running = running
-            running = []
-
-        if scheduled_seq_metadata_list:
-            self.whose_turn = Turn.DECODE
+                SequenceScheduleMetadata.from_sequence(seq))
+            num_batched_tokens += 1
+        
+        if self.done:
             return SchedulerOutputs(
-                id=self._iteration_id,
+                id=self.count,
                 ignored_seq_ids=ignored_seq_ids,
-                preempted_seq_ids=preempted_seq_ids,
-                scheduled_seq_metadata_list=scheduled_seq_metadata_list,
+                preempted_seq_ids=[],
+                scheduled_seq_metadata_list=[]
+            )
+        
+
+        # we want our requests that violated deadlines to be after those that haven't
+        # this way if we need to kick out some decodes, we kick the ones that violated deadlines first
+        num_prefill_tokens = 0
+
+        # Second pass, add any running prefills
+        decodes = []
+
+        while (
+            self.running and
+            num_prefill_tokens <= self.prompt_limit
+        ):
+
+            seq = self.running.pop(0)
+            if seq.seq_id == 212:
+                print(seq.get_num_prompt_tokens_processed(), seq.get_prompt_len(), 'seq_id')
+            if seq.prompt_processing_finished:
+                decodes.append(seq)
+                continue
+            
+            assert seq.is_paused()
+            next_num_prefill_tokens = min(
+                self.prompt_limit - num_prefill_tokens,
+                seq.get_prompt_len() - seq.get_num_prompt_tokens_processed()
             )
 
-        while self.waiting and self.whose_turn == Turn.PREFILL:
+            # Assumption: No pipeline parallel
+            num_batched_tokens += next_num_prefill_tokens
+            num_prefill_tokens += next_num_prefill_tokens
+            scheduled_seq_metadata_list.append(
+                SequenceScheduleMetadata.from_sequence(
+                    seq, prompt_chunk_len=next_num_prefill_tokens))
+            running.append(seq)
+
+            predicted_batch_time = 1e-9
+
+        # Third pass, add any waiting prefills
+
+        while (
+            self.waiting and
+            num_prefill_tokens <= self.prompt_limit
+        ):
+
             seq = self.waiting[0]
-            # This is required to handle benchmarking where
-            # we set request arrival time ahead of time
+            # This is required to handle benchmarking where we set request arrival time ahead of time
             if seq.arrival_time > now:
-                break
+                # sleep for the time until the next request arrives
+                time.sleep(seq.arrival_time - now)
 
-            if not self._check_request_prompt_length(seq):
-                ignored_seq_ids.append(seq.seq_id)
-                continue
-
-            # If the sequence group cannot be allocated, stop.
+            # If the sequence cannot be allocated, stop.
             if not self.block_manager.can_allocate(seq):
+                # this is different from vllm scheduler
+                # even if we cannot allocate this sequence
+                # there might be other sequences that can be allocated
+                self.done = True
                 break
 
-            if len(self.running) + 1 > self.scheduler_config.max_num_seqs:
+            # The total number of sequences in the RUNNING state should not
+            # exceed the maximum number of sequences.
+            if len(running) >= self.scheduler_config.max_num_seqs:
                 break
 
-            next_num_prefill_tokens = self._get_seq_next_num_prefill_tokens(
-                seq, num_batched_tokens
+            next_num_prefill_tokens = min(
+                self.prompt_limit - num_prefill_tokens,
+                seq.get_prompt_len() - seq.get_num_prompt_tokens_processed()
             )
 
             if next_num_prefill_tokens == 0:
-                # not enough space to allocate the sequence
                 break
 
-            self.waiting.pop(0)
+            seq = self.waiting.pop(0)
             self._allocate(seq)
-            self.running.append(seq)
             num_batched_tokens += next_num_prefill_tokens
+            num_prefill_tokens += next_num_prefill_tokens
             scheduled_seq_metadata_list.append(
                 SequenceScheduleMetadata.from_sequence(
-                    seq, prompt_chunk_len=next_num_prefill_tokens
-                )
-            )
-
-        if scheduled_seq_metadata_list or ignored_seq_ids:
-            self.whose_turn = Turn.DECODE
+                    seq, prompt_chunk_len=next_num_prefill_tokens))
+            running.append(seq)
+            predicted_batch_time = 1e-9
+        
+        if self.done:
             return SchedulerOutputs(
-                id=self._iteration_id,
+                id=self.count,
                 ignored_seq_ids=ignored_seq_ids,
-                preempted_seq_ids=preempted_seq_ids,
-                scheduled_seq_metadata_list=scheduled_seq_metadata_list,
+                preempted_seq_ids=[],
+                scheduled_seq_metadata_list=[]
             )
 
-        # if we reach here it means that there were no prefills
-        # to execute, and we should switch to decode turn to avoid idle cycle
-        while self.running:
-            seq = self.running.pop(0)
 
-            if not seq.is_paused():
-                # The sequence group is already in the RUNNING state.
-                running.append(seq)
-                continue
 
-            if not seq.prompt_stage_processing_finished:
-                running.append(seq)
-                continue
+        # Add the unscheduled decodes back to the running queue
 
-            while not self.block_manager.can_append_slot():
-                if self.running:
-                    # Preempt the lowest-priority sequence groups.
-                    victim_seq = self.running.pop(-1)
-                    self._preempt(victim_seq)
-                    preempted_seq_ids.append(victim_seq.seq_id)
-                else:
-                    # No other sequence groups can be preempted.
-                    # Preempt the current sequence group.
-                    self._preempt(seq)
-                    preempted_seq_ids.append(seq.seq_id)
-                    break
-            else:
-                # Append new slots to the sequence group.
-                self._append_slot(seq)
-                running.append(seq)
-                scheduled_seq_metadata_list.append(
-                    SequenceScheduleMetadata.from_sequence(seq)
-                )
+        if self.running:
+            self.running.extend(running)
+        else:
+            self.running = running
+        
+        if decodes:
+            self.running.extend(decodes)
 
-        self.running = running
-        self.whose_turn = Turn.PREFILL
-        scheduler_outputs = SchedulerOutputs(
-            id=self._iteration_id,
+        if scheduled_seq_metadata_list:
+            self.count += 1
+            # print(self.M, self.count, self.begin_decodes, len(self.running), 'M and count')
+            if self.count == (4 * self.M):
+                self.prompt_limit = self.B
+                self.begin_decodes = True
+
+        return SchedulerOutputs(
+            id=self.count,
             ignored_seq_ids=ignored_seq_ids,
-            preempted_seq_ids=preempted_seq_ids,
-            scheduled_seq_metadata_list=scheduled_seq_metadata_list,
+            preempted_seq_ids=[],
+            scheduled_seq_metadata_list=scheduled_seq_metadata_list
         )
-        return scheduler_outputs

@@ -20,6 +20,7 @@ class EngineSequenceManager(BaseSequenceManager):
 
     def _decode_seq(self, seq: Sequence) -> None:
         """Decodes the new token for a sequence."""
+        return
         (new_tokens, new_output_text, prefix_offset, read_offset) = (
             detokenize_incrementally(
                 self.tokenizer,

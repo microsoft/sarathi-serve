@@ -14,7 +14,7 @@ from torch import nn
 
 from sarathi.metrics.constants import OperationMetrics
 from sarathi.metrics.cuda_timer import CudaTimer
-from sarathi.model_executor.attention.base_attention_wrapper import BaseAttentionWrapper
+from sarathi.model_executor.attention import get_attention_wrapper
 from sarathi.model_executor.layers.activation import SiluAndMul
 from sarathi.model_executor.layers.layernorm import RMSNorm
 from sarathi.model_executor.layers.rotary_embedding import get_rope
@@ -39,6 +39,7 @@ from sarathi.model_executor.weight_utils import (
     load_tensor_parallel_weights,
 )
 from sarathi.transformers_utils.configs.qwen import QWenConfig
+from sarathi.worker.cache_engine import KVCache
 
 
 class QWenMLP(nn.Module):
@@ -137,8 +138,7 @@ class QWenAttention(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        layer_cache_idx: int,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_cache: KVCache,
     ) -> torch.Tensor:
         qkv, _ = self.c_attn(hidden_states)
         q, k, v = qkv.chunk(chunks=3, dim=-1)
@@ -146,11 +146,11 @@ class QWenAttention(nn.Module):
         with self._attn_rope_timer:
             q, k = self.rotary_emb(positions, q, k)
 
-        attn_output = attention_backend_wrapper.forward(
+        attn_output = get_attention_wrapper().forward(
             q,
             k,
             v,
-            layer_cache_idx,
+            kv_cache,
             self.scaling,
         )
 
@@ -185,8 +185,7 @@ class QWenBlock(nn.Module):
         self,
         positions: torch.Tensor,
         hidden_states: torch.Tensor,
-        layer_cache_idx: int,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_cache: KVCache,
     ) -> torch.Tensor:
         # Self Attention
         residual = hidden_states
@@ -194,8 +193,7 @@ class QWenBlock(nn.Module):
         hidden_states = self.attn(
             positions=positions,
             hidden_states=hidden_states,
-            layer_cache_idx=layer_cache_idx,
-            attention_backend_wrapper=attention_backend_wrapper,
+            kv_cache=kv_cache,
         )
         hidden_states = residual + hidden_states
 
@@ -237,7 +235,7 @@ class QWenModel(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_caches: List[KVCache],
     ) -> torch.Tensor:
         if self.wte:
             hidden_states = self.wte(hidden_states)
@@ -245,7 +243,9 @@ class QWenModel(nn.Module):
         for i in range(len(self.h)):
             layer = self.h[i]
             hidden_states = layer(
-                positions, hidden_states, i, attention_backend_wrapper
+                positions,
+                hidden_states,
+                kv_caches[i],
             )
         if self.ln_f:
             hidden_states = self.ln_f(hidden_states)
@@ -279,7 +279,7 @@ class QWenLMHeadModel(nn.Module):
         self,
         hidden_states: torch.Tensor,
         positions: torch.Tensor,
-        attention_backend_wrapper: BaseAttentionWrapper,
+        kv_caches: List[KVCache],
     ) -> torch.Tensor:
         if not self.is_pipeline_first_stage:
             # hidden_states_shape: num_tokens x hidden_size
@@ -289,9 +289,7 @@ class QWenLMHeadModel(nn.Module):
                 device=hidden_states.device,
             )
             hidden_states = recv(hidden_states)
-        hidden_states = self.transformer(
-            hidden_states, positions, attention_backend_wrapper
-        )
+        hidden_states = self.transformer(hidden_states, positions, kv_caches)
 
         if not self.is_pipeline_last_stage:
             send(hidden_states)
