@@ -8,6 +8,10 @@ import zmq
 
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs
+from sarathi.core.proto_utils import (
+    deserialize_step_inputs,
+    serialize_sampler_outputs,
+)
 from sarathi.logger import init_logger
 from sarathi.utils.threading_utils import exit_on_error, synchronized
 from sarathi.worker.base_worker import BaseWorker
@@ -54,15 +58,19 @@ class PipelineParallelWorker(BaseWorker):
         self.worker_ready_event.set()
 
         while True:
-            step_inputs = self.enqueue_socket.recv_pyobj()
+            # Receive protobuf-serialized data
+            data = self.enqueue_socket.recv()
+            step_inputs = deserialize_step_inputs(data)
 
-            for new_seq in step_inputs.new_seqs:
-                self.seq_manager.add_seq(new_seq)
+            if step_inputs.new_seqs:
+                for new_seq in step_inputs.new_seqs:
+                    self.seq_manager.add_seq(new_seq)
 
-            for pending_step_output in step_inputs.pending_step_outputs:
-                self.seq_manager.on_step_completed(
-                    pending_step_output[0], pending_step_output[1]
-                )
+            if step_inputs.pending_step_outputs:
+                for pending_step_output in step_inputs.pending_step_outputs:
+                    self.seq_manager.on_step_completed(
+                        pending_step_output[0], pending_step_output[1]
+                    )
 
             output = self.execute_model(step_inputs.scheduler_outputs)
 
@@ -70,9 +78,12 @@ class PipelineParallelWorker(BaseWorker):
                 continue
 
             if self.is_last_pipeline_stage:
-                self.output_socket.send_pyobj(output)
+                # Send protobuf-serialized output
+                serialized_output = serialize_sampler_outputs(output)
+                self.output_socket.send(serialized_output)
             elif self.is_first_pipeline_stage:
-                self.microbatch_socket.send_pyobj(None)
+                # Send empty message as signal
+                self.microbatch_socket.send(b"")
 
     @synchronized
     def get_model_parallel_ranks(self) -> Tuple[int, int]:

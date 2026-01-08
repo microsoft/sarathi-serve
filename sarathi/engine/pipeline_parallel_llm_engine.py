@@ -11,6 +11,10 @@ from sarathi.core.datatypes.request_output import RequestOutput
 from sarathi.core.datatypes.scheduler_output import SchedulerOutputs
 from sarathi.core.datatypes.sequence import SamplerOutputs, SequenceMetadata
 from sarathi.core.datatypes.step_inputs import StepInputs
+from sarathi.core.proto_utils import (
+    deserialize_sampler_outputs,
+    serialize_step_inputs,
+)
 from sarathi.engine.base_llm_engine import BaseLLMEngine
 from sarathi.logger import init_logger
 from sarathi.utils.threading_utils import exit_on_error, synchronized
@@ -140,13 +144,14 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
 
             if not scheduler_outputs.is_empty():
                 self.microbatch_watch_event.set()
-                self.enqueue_socket.send_pyobj(
-                    StepInputs(
-                        scheduler_outputs,
-                        new_seqs=self._get_new_seqs(),
-                        pending_step_outputs=self._get_pending_step_outputs(),
-                    )
+                # Serialize and send step inputs
+                step_inputs = StepInputs(
+                    scheduler_outputs,
+                    new_seqs=self._get_new_seqs(),
+                    pending_step_outputs=self._get_pending_step_outputs(),
                 )
+                serialized_inputs = serialize_step_inputs(step_inputs)
+                self.enqueue_socket.send(serialized_inputs)
 
             self.metrics_store.on_schedule(seq_metadata_list, start_time, end_time)
 
@@ -154,7 +159,8 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
     def _microbatch_watch_loop(self) -> None:
         while True:
             self.microbatch_watch_event.wait()
-            self.microbatch_socket.recv_pyobj()
+            # Receive empty signal message
+            self.microbatch_socket.recv()
             self.schedule_event.set()
 
     @exit_on_error
@@ -162,7 +168,9 @@ class PipelineParallelLLMEngine(BaseLLMEngine):
         while True:
             scheduler_stage_output = self.scheduler_output_queue.get()
 
-            sampler_outputs = self.output_socket.recv_pyobj()
+            # Receive and deserialize sampler outputs
+            data = self.output_socket.recv()
+            sampler_outputs = deserialize_sampler_outputs(data)
 
             self._append_pending_step_output(
                 scheduler_stage_output.scheduler_outputs, sampler_outputs

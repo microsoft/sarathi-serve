@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package sarathi.core.proto;
+
+// Sampling parameters for text generation
+message SamplingParams {
+    float temperature = 1;
+    float top_p = 2;
+    int32 top_k = 3;
+    repeated string stop = 4;
+    bool ignore_eos = 5;
+    int32 max_tokens = 6;
+}
+
+// Logical token block information
+message LogicalTokenBlock {
+    int32 block_number = 1;
+    int32 block_size = 2;
+    repeated int32 token_ids = 3;
+    int32 num_tokens = 4;
+}
+
+// Sequence state information
+message SequenceState {
+    string id = 1;
+    double arrived_at = 2;
+    int32 num_prompt_tokens = 3;
+    int32 num_output_tokens = 4;
+    string status = 5; // We'll use string representation of SequenceStatus enum
+    bool is_scheduled = 6;
+    bool is_completed = 7;
+    optional double scheduled_at = 8;
+    optional double completed_at = 9;
+    optional double prompt_processing_completed_at = 10;
+    optional double last_restart_at = 11;
+    optional double last_pause_at = 12;
+    double execution_time = 13;
+    double preempted_time = 14;
+    optional double last_execution_start_at = 15;
+    int32 num_restarts = 16;
+    int32 num_pauses = 17;
+    bool is_ignore_finished = 18;
+    optional double last_token_generated_at = 19;
+    double last_token_generation_time = 20;
+}
+
+// Full sequence information
+message Sequence {
+    string seq_id = 1;
+    string prompt = 2;
+    repeated int32 prompt_token_ids = 3;
+    int32 block_size = 4;
+    int32 eos_token_id = 5;
+    double arrival_time = 6;
+    SamplingParams sampling_params = 7;
+    repeated int32 output_token_ids = 8;
+    int32 prompt_tokens_processed = 9;
+    int32 prompt_tokens_stage_processed = 10;
+    bool prompt_processing_finished = 11;
+    bool prompt_stage_processing_finished = 12;
+    string output_text = 13;
+    repeated LogicalTokenBlock logical_token_blocks = 14;
+    int32 prefix_offset = 15;
+    int32 read_offset = 16;
+    repeated string tokens = 17;
+    SequenceState state = 18;
+}
+
+// Metadata for scheduled sequences
+message SequenceScheduleMetadata {
+    string seq_id = 1;
+    int32 prompt_chunk_len = 2;
+}
+
+// Sampler output for a single sequence
+message SamplerOutput {
+    string seq_id = 1;
+    int32 output_token = 2;
+}
+
+// List of sampler outputs
+message SamplerOutputs {
+    repeated SamplerOutput outputs = 1;
+}
+
+// Scheduler outputs
+message SchedulerOutputs {
+    int32 id = 1;
+    repeated string ignored_seq_ids = 2;
+    repeated string preempted_seq_ids = 3;
+    repeated SequenceScheduleMetadata scheduled_seq_metadata_list = 4;
+    repeated int32 prompt_chunk_lens = 5;
+    int32 num_batched_prompt_tokens = 6;
+    int32 num_batched_output_tokens = 7;
+    int32 num_batched_tokens = 8;
+}
+
+// Step inputs sent from engine to workers
+message StepInputs {
+    SchedulerOutputs scheduler_outputs = 1;
+    repeated Sequence new_seqs = 2;
+    repeated PendingStepOutput pending_step_outputs = 3;
+}
+
+// Used for pipeline parallel communication
+message PendingStepOutput {
+    SchedulerOutputs scheduler_outputs = 1;
+    SamplerOutputs sampler_outputs = 2;
+}
