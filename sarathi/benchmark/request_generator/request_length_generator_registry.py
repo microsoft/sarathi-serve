@@ -7,6 +7,9 @@ from sarathi.benchmark.request_generator.trace_request_length_generator import (
 from sarathi.benchmark.request_generator.uniform_request_length_generator import (
     UniformRequestLengthGenerator,
 )
+from sarathi.benchmark.request_generator.dataset_request_length_generator import (
+    DatasetRequestLengthGenerator
+)
 from sarathi.benchmark.request_generator.zipf_request_length_generator import (
     ZipfRequestLengthGenerator,
 )
@@ -29,4 +32,7 @@ RequestLengthGeneratorRegistry.register(
 )
 RequestLengthGeneratorRegistry.register(
     RequestLengthGeneratorType.FIXED, FixedRequestLengthGenerator
+)
+RequestLengthGeneratorRegistry.register(
+    RequestLengthGeneratorType.DATASET, DatasetRequestLengthGenerator
 )

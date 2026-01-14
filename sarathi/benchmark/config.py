@@ -161,6 +161,35 @@ class FixedRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
         return RequestLengthGeneratorType.FIXED
 
 
+
+@dataclass
+class DatasetRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
+    dataset: str = field(
+        default="ccdv/arxiv-summarization",
+        metadata={"help": "Path to the trace file for request lengths."},
+    )
+    meta_prompt: str = field(
+        default=None,
+        metadata={"help": "Meta prompt for the dataset."},
+    )
+    max_prompt_len: int = field(
+        default=4096, metadata={"help": "Maximum prompt length allowed."}
+    )
+    max_num_prompts: int = field(
+        default=300, metadata={"help": "Maximum number of prompts to use."}
+    )
+    max_decode_tokens: int = field(
+        default=512, metadata={"help": "Maximum number of decode tokens."}
+    )
+    tokenizer_model: str = field(
+        default="meta-llama/Meta-Llama-3-8B-Instruct", metadata={"help": "Name or path of the huggingface model to use for the tokenizer."}
+    )
+
+    @staticmethod
+    def get_type():
+        return RequestLengthGeneratorType.DATASET
+
+
 @dataclass
 class BaseRequestGeneratorConfig(BasePolyConfig):
     seed: int = field(
@@ -214,6 +243,19 @@ class TraceRequestGeneratorConfig(BaseRequestGeneratorConfig):
     def get_type():
         return RequestGeneratorType.TRACE
 
+@dataclass
+class CorrectnessTestConfig(BaseTestConfig):
+    run_correctness_tests: bool = field(
+        default=False, metadata={"help": "Collect correctness data in this run"}
+    )
+    run_correctness_baseline: bool = field(
+        default=False, metadata={"help": "Make this correctness ground truth for correctness tests"}
+    )
+    correctness_test_file: bool = field(
+        default=None, metadata={"help": "Ground truth file for model output. If run_correctness_baseline is True, then the model output will be saved to \
+                                this file to be used as a ground truth file. Otherwise, the test will read from this file to be used as ground truth for \
+                                the correctness test."}
+    )
 
 @dataclass
 class BenchmarkConfig(BaseEndpointConfig):
@@ -239,6 +281,9 @@ class BenchmarkConfig(BaseEndpointConfig):
     )
     request_generator_config: BaseRequestGeneratorConfig = field(
         default_factory=SyntheticRequestGeneratorConfig
+    )
+    correctness_test_config: Optional[CorrectnessTestConfig] = field(
+        default_factory=CorrectnessTestConfig
     )
 
     def __post_init__(self):
