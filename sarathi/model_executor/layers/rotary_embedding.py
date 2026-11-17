@@ -179,6 +179,52 @@ class DynamicNTKScalingRotaryEmbedding(RotaryEmbedding):
         return cache
 
 
+class Llama3RotaryEmbedding(RotaryEmbedding):
+
+    def __init__(
+        self,
+        head_size: int,
+        rotary_dim: int,
+        max_position_embeddings: int,
+        base: int,
+        is_neox_style: bool,
+        scaling_factor: float,
+        low_freq_factor: float,
+        high_freq_factor: float,
+        orig_max_position: int,
+    ) -> None:
+        self.scaling_factor = scaling_factor
+        self.low_freq_factor = low_freq_factor
+        self.high_freq_factor = high_freq_factor
+        self.orig_max_position = orig_max_position
+        super().__init__(
+            head_size, rotary_dim, max_position_embeddings, base, is_neox_style
+        )
+
+    def _compute_inv_freq(self, base: Union[int, float]) -> torch.Tensor:
+        inv_freqs = super()._compute_inv_freq(base)
+        low_freq_wavelen = self.orig_max_position / self.low_freq_factor
+        high_freq_wavelen = self.orig_max_position / self.high_freq_factor
+
+        wave_len = 2 * math.pi / inv_freqs
+        if self.low_freq_factor != self.high_freq_factor:
+            smooth = (self.orig_max_position / wave_len - self.low_freq_factor) / (
+                self.high_freq_factor - self.low_freq_factor
+            )
+        else:
+            smooth = 0
+        new_freqs = torch.where(
+            wave_len < high_freq_wavelen,
+            inv_freqs,
+            torch.where(
+                wave_len > low_freq_wavelen,
+                inv_freqs / self.scaling_factor,
+                (1 - smooth) * inv_freqs / self.scaling_factor + smooth * inv_freqs,
+            ),
+        )
+        return new_freqs
+
+
 # Inverse dim formula to find dim based on number of rotations
 def _yarn_find_correction_dim(
     num_rotations: int,
@@ -311,9 +357,28 @@ def get_rope(
             head_size, rotary_dim, max_position, base, is_neox_style
         )
     else:
-        scaling_type = rope_scaling["type"]
+        scaling_type = (
+            rope_scaling["type"]
+            if "type" in rope_scaling
+            else rope_scaling["rope_type"]
+        )
         scaling_factor = rope_scaling["factor"]
-        if scaling_type == "linear":
+        if scaling_type == "llama3":
+            low_freq_factor = rope_scaling["low_freq_factor"]
+            high_freq_factor = rope_scaling["high_freq_factor"]
+            original_max_position = rope_scaling["original_max_position_embeddings"]
+            rotary_emb = Llama3RotaryEmbedding(
+                head_size,
+                rotary_dim,
+                max_position,
+                base,
+                is_neox_style,
+                scaling_factor,
+                low_freq_factor,
+                high_freq_factor,
+                original_max_position,
+            )
+        elif scaling_type == "linear":
             rotary_emb = LinearScalingRotaryEmbedding(
                 head_size, rotary_dim, max_position, base, is_neox_style, scaling_factor
             )
