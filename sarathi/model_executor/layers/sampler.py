@@ -63,6 +63,20 @@ class Sampler(nn.Module):
             # Use in-place division to avoid creating a new tensor.
             logits.div_(t.unsqueeze(dim=1))
 
+        # Greedy requests (temperature 0) take the argmax. Their temperature was
+        # replaced by 1.0 above and they must use top_p=1 / top_k=-1, so
+        # their logits are unchanged here. Pick before sampling in case the
+        # sampling kernel works on the logits in place.
+        greedy_indices = _get_greedy_indices(seq_metadata_list)
+        greedy_token_ids = None
+        if greedy_indices:
+            greedy_rows = torch.tensor(
+                greedy_indices, dtype=torch.long, device=logits.device
+            )
+            greedy_token_ids = torch.argmax(
+                logits.index_select(0, greedy_rows), dim=-1
+            ).cpu()
+
         # Apply top-p and top-k truncation.
         top_ps, top_ks = _get_top_p_top_k(seq_metadata_list, self.vocab_size)
         assert len(top_ps) == len(top_ks) == logits.shape[0]
@@ -79,6 +93,11 @@ class Sampler(nn.Module):
             flashinfer_sample_result = _top_k_top_p_with_flashinfer(
                 logits, top_ks, top_ps
             ).cpu()
+
+        if greedy_token_ids is not None:
+            flashinfer_sample_result[greedy_indices] = greedy_token_ids.to(
+                flashinfer_sample_result.dtype
+            )
 
         return [
             SamplerOutput(seq_metadata_list[i].seq.seq_id, flashinfer_sample_result[i])
@@ -130,6 +149,14 @@ def _get_temperatures(seq_metadata_list: List[SequenceMetadata]) -> List[float]:
             temperature = 1.0
         temperatures.append(temperature)
     return temperatures
+
+
+def _get_greedy_indices(seq_metadata_list: List[SequenceMetadata]) -> List[int]:
+    return [
+        i
+        for i, seq_metadata in enumerate(seq_metadata_list)
+        if seq_metadata.seq.sampling_params.sampling_type == SamplingType.GREEDY
+    ]
 
 
 def _get_top_p_top_k(
