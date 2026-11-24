@@ -32,7 +32,7 @@ class RequestLengthGeneratorType(Enum):
     ZIPF = "ZIPF"
     TRACE = "TRACE"
     FIXED = "FIXED"
-
+    DATASET = "DATASET"
 
 class AttentionBackend(Enum):
     FLASHINFER = "FLASHINFER"

@@ -43,11 +43,18 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
 
         if prefill_tokens is None or decode_tokens is None:
             return None
+        
+        prompt = None
+        # custom request prompt
+        if type(prefill_tokens) is str:
+            prompt = prefill_tokens
+            prefill_tokens = len(prefill_tokens)
 
         return Request(
             arrived_at=arrived_at,
             num_prefill_tokens=int(prefill_tokens),
             num_decode_tokens=int(decode_tokens),
+            prompt=prompt
         )
 
     def _generate_requests(self) -> List[Request]:
