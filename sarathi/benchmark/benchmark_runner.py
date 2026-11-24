@@ -70,10 +70,15 @@ class BenchmarkRunner:
             temperature=0,
             top_p=1.0,
         )
-        prompt_token_ids = [1] * request.num_prefill_tokens
+        # use prompt if provided
+        prompt, prompt_token_ids = None, None
+        if request.prompt:
+            prompt = request.prompt
+        else:
+            prompt_token_ids = [1] * request.num_prefill_tokens
 
         return {
-            "prompt": None,
+            "prompt": prompt,
             "prompt_token_ids": prompt_token_ids,
             "sampling_params": sampling_params,
             "arrival_time": first_request_time + request.arrived_at,
